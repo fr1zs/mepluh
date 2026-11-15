@@ -1,7 +1,9 @@
 import type { PluginDefinition } from "@shared/plugin";
+import arrowSeek from "./arrowSeek";
 import customCss from "./customCss";
 import devTools from "./devTools";
 import featureFlags from "./featureFlags";
+import hideOnlineFeatures from "./hideOnlineFeatures";
 import noAds from "./noAds";
 import noAutoUpdate from "./noAutoUpdate";
 import noPromotions from "./noPromotions";
@@ -11,4 +13,4 @@ import settings from "./settings";
 import unlockSoundAlerts from "./unlockSoundAlerts";
 import windowEffects from "./windowEffects";
 
-export const plugins: readonly PluginDefinition[] = [settings, noAds, noPromotions, noTelemetry, noAutoUpdate, featureFlags, customCss, windowEffects, richPresence, unlockSoundAlerts, devTools];
+export const plugins: readonly PluginDefinition[] = [settings, noAds, noPromotions, hideOnlineFeatures, noTelemetry, noAutoUpdate, featureFlags, customCss, windowEffects, richPresence, unlockSoundAlerts, arrowSeek, devTools];

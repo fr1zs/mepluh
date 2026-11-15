@@ -1,20 +1,9 @@
-[![Mepluh](assets/banner.svg)](https://github.com/prettylittlelies/mepluh)
+[![Mepluh](assets/banner.svg)](https://github.com/fr1zs/mepluh)
 
-<p align="center"><b>A client mod for Medal. No ads, no tracking, and themes you actually want.</b></p>
-
-<p align="center">
-  <a href="https://github.com/prettylittlelies/mepluh"><img src="https://img.shields.io/github/languages/code-size/prettylittlelies/mepluh?style=for-the-badge&labelColor=0a0a0a&color=cfff53&label=code%20size" alt="Code size"></a>
-  <a href="https://github.com/prettylittlelies/mepluh/stargazers"><img src="https://img.shields.io/github/stars/prettylittlelies/mepluh?style=for-the-badge&labelColor=0a0a0a&color=cfff53&logo=github&logoColor=white" alt="Stars"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/prettylittlelies/mepluh?style=for-the-badge&labelColor=0a0a0a&color=cfff53" alt="License"></a>
-  <br>
-  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-000000?style=for-the-badge&logo=bun&logoColor=white" alt="Bun"></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-000000?style=for-the-badge&logo=typescript&logoColor=3178c6" alt="TypeScript"></a>
-  <a href="https://www.electronjs.org"><img src="https://img.shields.io/badge/Electron-000000?style=for-the-badge&logo=electron&logoColor=9feaf9" alt="Electron"></a>
-  <a href="#install"><img src="https://img.shields.io/badge/Windows-000000?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTAgMGgxMS4ydjExLjJIMHpNMTIuOCAwSDI0djExLjJIMTIuOHpNMCAxMi44aDExLjJWMjRIMHpNMTIuOCAxMi44SDI0VjI0SDEyLjh6Ii8%2BPC9zdmc%2B" alt="Windows"></a>
-</p>
+<p align="center"><b>A fix for Mepluh, a mod for Medal</b></p>
 
 <p align="center">
-  <a href="#features">Features</a> · <a href="#install">Install</a> · <a href="#plugins">Plugins</a> · <a href="#themes">Themes</a> · <a href="CONTRIBUTING.md">Contributing</a>
+  <a href="#features">Features</a> · <a href="#install">Install</a> · <a href="#plugins">Plugins</a> · <a href="#themes">Themes</a>
 </p>
 
 ---
@@ -29,17 +18,30 @@
 - 🎨 **Themes.** Catppuccin, Transparency, your own `.css` files or any theme URL, applied live.
 - 🫧 **Liquid Glass.** Refractive, light-reactive glass with Windows 11 Acrylic and Mica backdrops.
 - ✏️ **Custom CSS.** A built-in Monaco editor with autocomplete and live preview.
+- ⏩ **Arrow seeking.** Scrub through clips effortlessly using your keyboard's arrow keys.
+- 🔌 **Offline focus.** Strip away social feeds and online clutter, and lock down auto-updates.
+- 🎮 **Discord Rich Presence.** Broadcast your Medal activity directly to your Discord profile.
+- 🔊 **Unlocked sound alerts.** Access restricted sound alerts right out of the box.
 
 ## Install
 
-Requires Windows, Medal and [Bun](https://bun.sh).
+Requires Windows (CMD no admin), Medal and [Bun](https://bun.sh).
 
 ```sh
-git clone https://github.com/prettylittlelies/mepluh
+git clone https://github.com/frizs/mepluh
 cd mepluh
 bun install
 bun run inject
 ```
+
+*OR, if you dont want to use git:*
+1. Download the whole .zip file, extract it, and store it somewhere safe.
+2. Right-Click inside the folder and "Open in terminal"
+3. Run: 
+```sh 
+bun install
+bun run inject 
+``` 
 
 Open Medal's settings and look for the **Mepluh** section.
 
@@ -56,6 +58,12 @@ Medal's updater replaces its install folder, so run `bun run inject` again after
 | CustomCSS | Applies `%APPDATA%\Mepluh\custom.css` live. |
 | FeatureFlags | Overrides Medal's feature flags. |
 | DevTools | Opens DevTools with F12 or Ctrl+Shift+I. |
+| ArrowSeek | Seeks forward and backward in clips using the arrow keys. |
+| HideOnlineFeatures | Hides social, feed, and online-only tabs for a local-first experience. |
+| NoAutoUpdate | Prevents Medal from automatically downloading and installing updates. |
+| RichPresence | Displays your current Medal activity on Discord Rich Presence. |
+| Settings | Integrates Mepluh's configuration tab natively into Medal's settings. |
+| UnlockSoundAlerts | Unlocks restricted sound alerts and audio effects. |
 
 ## Themes
 
@@ -63,6 +71,5 @@ Drop any `.css` file into `%APPDATA%\Mepluh\themes` and enable it under **Mepluh
 
 Built in: **Catppuccin** (Latte, Frappé, Macchiato, Mocha) and **Transparency**. Change the Catppuccin accent with `:root { --ctp-accent: var(--ctp-pink); }` in Custom CSS.
 
-## License
-
-[GPL-3.0-or-later](LICENSE)
+## ORIGINAL PROJECT
+https://github.com/prettylittlelies/mepluh

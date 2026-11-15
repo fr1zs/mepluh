@@ -22,6 +22,25 @@ const resolveEntry = (root: AsarDirectoryEntry, path: string): AsarFileEntry => 
     return entry;
 };
 
+export const listAsarFiles = async (archive: string): Promise<readonly string[]> => {
+    const handle = await open(archive, "r");
+    try {
+        const prefix = Buffer.alloc(HEADER_PREFIX_BYTES);
+        await handle.read(prefix, 0, HEADER_PREFIX_BYTES, 0);
+        const jsonLength = prefix.readUInt32LE(12);
+        const json = Buffer.alloc(jsonLength);
+        await handle.read(json, 0, jsonLength, HEADER_PREFIX_BYTES);
+        const walk = (node: AsarDirectoryEntry, base: string): string[] =>
+            Object.entries(node.files).flatMap(([name, entry]) => {
+                const path = base ? `${base}/${name}` : name;
+                return "files" in entry ? walk(entry, path) : [path];
+            });
+        return walk(JSON.parse(json.toString("utf8")) as AsarDirectoryEntry, "");
+    } finally {
+        await handle.close();
+    }
+};
+
 export const readAsarFile = async (archive: string, path: string): Promise<Buffer> => {
     const handle = await open(archive, "r");
     try {

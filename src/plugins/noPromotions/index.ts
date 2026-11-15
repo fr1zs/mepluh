@@ -12,7 +12,7 @@ export default definePlugin({
             replacement: { match: /(\[\i\]\(\i,(\i)\)\{return )\2\.promotionalCtas\}/, replace: "$1{}}" }
         },
         {
-            find: chunkMarker("renderer-LibraryAd"),
+            find: chunkMarker("renderer-LibraryAdsWrapper"),
             replacement: { match: /sponsorCard:\i(?=[,}])/g, replace: "sponsorCard:null" }
         }
     ]

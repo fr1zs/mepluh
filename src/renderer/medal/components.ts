@@ -1,3 +1,4 @@
+import { Logger } from "@shared/logger";
 import { importExport } from "./chunks";
 import type { Children, Component, JsxRuntime, MedalNode, ReactApi } from "./types";
 
@@ -59,15 +60,6 @@ export interface MedalComponents {
     readonly Link: Component<WrapperProps & { readonly to?: string; readonly href?: string; readonly newWindow?: boolean }>;
     readonly EmptyState: Component<{ readonly icon: MedalNode; readonly header: Children; readonly subtext?: Children; readonly button?: MedalNode; readonly compact?: boolean }>;
     readonly Skeleton: Component<{ readonly className?: string }>;
-    readonly Input: Component<{
-        readonly value: string;
-        readonly onChange: (event: { readonly currentTarget: HTMLInputElement }) => void;
-        readonly onBlur?: () => void;
-        readonly placeholder?: string;
-        readonly spellCheck?: boolean;
-        readonly inputHeight?: "large" | "medium" | "auto";
-        readonly className?: string;
-    }>;
     readonly InputGroup: Component<WrapperProps>;
     readonly InputGroupInput: Component<{
         readonly value: string;
@@ -85,7 +77,7 @@ export interface MedalComponents {
     readonly TabsList: Component<WrapperProps>;
     readonly TabsTrigger: Component<WrapperProps & { readonly value: string }>;
     readonly Dialog: Component<{ readonly open: boolean; readonly onOpenChange: (open: boolean) => void; readonly children?: Children }>;
-    readonly DialogContent: Component<WrapperProps & { readonly style?: Readonly<Record<string, string | number>> }>;
+    readonly DialogContent: Component<WrapperProps>;
     readonly DialogHeader: Component<WrapperProps>;
     readonly DialogFooter: Component<WrapperProps>;
     readonly DialogTitle: Component<WrapperProps>;
@@ -102,16 +94,16 @@ export interface MedalUi {
     readonly toast: (options: ToastOptions) => void;
 }
 
-type Source = readonly [chunk: string, exportName: string];
+export type Source = readonly [chunk: string, exportName: string];
 
-const factorySources = {
+export const factorySources = {
     React: ["renderer-react.production", "t"],
     runtime: ["renderer-react-jsx-runtime.production", "t"]
 } as const satisfies Record<"React" | "runtime", Source>;
 
-const toastSource: Source = ["renderer-toast", "r"];
+export const toastSource: Source = ["renderer-toast", "r"];
 
-const componentSources = {
+export const componentSources = {
     Page: ["renderer-SettingConfig", "n"],
     Section: ["renderer-SettingConfig", "t"],
     SectionTitle: ["renderer-SettingConfig", "s"],
@@ -132,7 +124,6 @@ const componentSources = {
     Link: ["renderer-Link", "t"],
     EmptyState: ["renderer-EmptyState", "t"],
     Skeleton: ["renderer-skeleton", "t"],
-    Input: ["renderer-FieldControl", "t"],
     InputGroup: ["renderer-input-group", "t"],
     InputGroupInput: ["renderer-input-group", "i"],
     InputGroupAddon: ["renderer-input-group", "n"],
@@ -169,8 +160,27 @@ const resolveFactory = async <T>(source: Source): Promise<T> => {
     return (factory as () => T)();
 };
 
+const log = new Logger("medal-ui");
+
+export const unresolvedComponents: string[] = [];
+
+const missingComponent =
+    (label: string) =>
+    (): MedalNode | null =>
+        `[Mepluh: Medal component "${label}" could not be loaded]` as unknown as MedalNode;
+
 const resolveComponents = async (): Promise<MedalComponents> => {
-    const entries = await Promise.all(Object.entries(componentSources).map(async ([key, source]) => [key, await resolveSource(source)] as const));
+    const entries = await Promise.all(
+        Object.entries(componentSources).map(async ([key, source]) => {
+            try {
+                return [key, await resolveSource(source)] as const;
+            } catch (error) {
+                unresolvedComponents.push(key);
+                log.error(`Could not resolve ${key} (${source[0]}#${source[1]}). Medal was probably updated; run "bun run diagnose".`, error);
+                return [key, missingComponent(key)] as const;
+            }
+        })
+    );
     return Object.fromEntries(entries) as unknown as MedalComponents;
 };
 
