@@ -28,7 +28,7 @@
 Requires Windows (CMD no admin), Medal and [Bun](https://bun.sh).
 
 ```sh
-git clone https://github.com/frizs/mepluh
+git clone https://github.com/fr1zs/mepluh
 cd mepluh
 bun install
 bun run inject
