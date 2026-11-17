@@ -5,9 +5,13 @@ Stop-Process -Name "Medal" -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 1
 
 # Install Bun automatically if missing
+$env:Path += ";$env:USERPROFILE\.bun\bin"
 if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
     Write-Host "Installing Bun..." -ForegroundColor Cyan
-    irm bun.sh/install.ps1 | iex
+    $bunInstall = Join-Path $env:TEMP "bun-install.ps1"
+    Invoke-WebRequest -Uri "https://bun.sh/install.ps1" -OutFile $bunInstall
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $bunInstall
+    Remove-Item $bunInstall -Force -ErrorAction SilentlyContinue
     $env:Path += ";$env:USERPROFILE\.bun\bin"
 }
 
@@ -32,7 +36,7 @@ Remove-Item $extractTemp -Recurse -Force -ErrorAction SilentlyContinue
 # Install dependencies and patch Medal
 Set-Location $dir
 Write-Host "Installing dependencies and patching Medal..." -ForegroundColor Cyan
-bun install
+bun install --no-progress
 bun run inject
 
-Write-Host "`nDone! You can reopen Medal now." -ForegroundColor Green
+Write-Host "`nDone! You can close this window and reopen Medal now." -ForegroundColor Green
