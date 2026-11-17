@@ -51,4 +51,4 @@ try {
     # Non-fatal if rate-limited; in-app updater will sync on next check
 }
 
-Write-Host "`nDone! You can reopen Medal now." -ForegroundColor Green
+Write-Host "`nDone! You can close this window and reopen Medal now." -ForegroundColor Green
