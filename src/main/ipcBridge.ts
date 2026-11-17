@@ -102,12 +102,13 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             `New-Item -ItemType Directory -Path "${paths.data.replace(/\\/g, "\\\\")}" -Force | Out-Null`,
             `Set-Content -Path "${versionFile.replace(/\\/g, "\\\\")}" -Value "${latestSha}" -NoNewline`,
             `Write-Host "Update complete! Relaunching Medal..." -ForegroundColor Green`,
-            `if (Test-Path "${squirrelUpdater.replace(/\\/g, "\\\\")}") {`,
-            `    Start-Process -FilePath "${squirrelUpdater.replace(/\\/g, "\\\\")}" -ArgumentList "--processStart", "Medal.exe"`,
+            `$launchCmd = if (Test-Path "${squirrelUpdater.replace(/\\/g, "\\\\")}") {`,
+            `    '"${squirrelUpdater.replace(/\\/g, "\\\\")}" --processStart Medal.exe'`,
             `} else {`,
-            `    Start-Process -FilePath "${medalExe.replace(/\\/g, "\\\\")}"`,
+            `    '"${medalExe.replace(/\\/g, "\\\\")}"'`,
             `}`,
-            `Start-Sleep -Seconds 2`,
+            `Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $launchCmd } | Out-Null`,
+            `Start-Sleep -Seconds 1`,
             `exit 0`
         ].join("\r\n");
 
