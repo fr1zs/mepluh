@@ -2,6 +2,7 @@ import { app, ipcMain, net, shell } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { IpcChannel, type ModLocation, type MonacoAssets, type UpdateResult } from "@shared/ipc";
 import type { PatchReport } from "@shared/patchReport";
@@ -13,7 +14,7 @@ import type { SettingsStore } from "./settingsStore";
 import type { ThemeService } from "./themes/themeService";
 
 const GITHUB_COMMIT_API = "https://api.github.com/repos/fr1zs/mepluh/commits/main";
-const INSTALL_SCRIPT_URL = "https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1";
+const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zip";
 
 export interface PatchReportSource {
     readonly report: PatchReport;
@@ -66,17 +67,54 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             return "up-to-date";
         }
 
-        mkdirSync(paths.data, { recursive: true });
-        writeFileSync(versionFile, latestSha, "utf8");
+        const medalExe = process.execPath;
+        const updaterScript = join(tmpdir(), "mepluh-updater.ps1");
+        const scriptContent = [
+            `$ErrorActionPreference = "Stop"`,
+            `Write-Host "Waiting for Medal to close..." -ForegroundColor Cyan`,
+            `Start-Sleep -Seconds 2`,
+            `Stop-Process -Name "Medal" -Force -ErrorAction SilentlyContinue`,
+            `Start-Sleep -Seconds 1`,
+            `$env:Path += ";$env:USERPROFILE\\.bun\\bin"`,
+            `if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {`,
+            `    Write-Host "Installing Bun..." -ForegroundColor Cyan`,
+            `    $bunInstall = Join-Path $env:TEMP "bun-install.ps1"`,
+            `    Invoke-WebRequest -Uri "https://bun.sh/install.ps1" -OutFile $bunInstall`,
+            `    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $bunInstall`,
+            `    Remove-Item $bunInstall -Force -ErrorAction SilentlyContinue`,
+            `    $env:Path += ";$env:USERPROFILE\\.bun\\bin"`,
+            `}`,
+            `$dir = "$env:USERPROFILE\\mepluh"`,
+            `$zip = "$env:TEMP\\mepluh.zip"`,
+            `$extractTemp = "$env:TEMP\\mepluh-extract"`,
+            `Write-Host "Downloading latest Mepluh update..." -ForegroundColor Cyan`,
+            `Invoke-WebRequest -Uri "${REPO_ZIP_URL}" -OutFile $zip`,
+            `Remove-Item $extractTemp -Recurse -Force -ErrorAction SilentlyContinue`,
+            `Expand-Archive -Path $zip -DestinationPath $extractTemp -Force`,
+            `New-Item -ItemType Directory -Path $dir -Force | Out-Null`,
+            `Copy-Item -Path "$extractTemp\\mepluh-main\\*" -Destination $dir -Recurse -Force`,
+            `Remove-Item $zip, $extractTemp -Recurse -Force -ErrorAction SilentlyContinue`,
+            `Set-Location $dir`,
+            `Write-Host "Installing dependencies and patching Medal..." -ForegroundColor Cyan`,
+            `bun install`,
+            `bun run inject`,
+            `New-Item -ItemType Directory -Path "${paths.data.replace(/\\/g, "\\\\")}" -Force | Out-Null`,
+            `Set-Content -Path "${versionFile.replace(/\\/g, "\\\\")}" -Value "${latestSha}" -NoNewline`,
+            `Write-Host "Update complete! Relaunching Medal..." -ForegroundColor Green`,
+            `Start-Process -FilePath "${medalExe.replace(/\\/g, "\\\\")}"`,
+            `Start-Sleep -Seconds 2`
+        ].join("\r\n");
+
+        writeFileSync(updaterScript, scriptContent, "utf8");
 
         const child = spawn(
-            "powershell.exe",
-            ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", `irm ${INSTALL_SCRIPT_URL} | iex`],
-            { detached: true, stdio: "ignore" }
+            "cmd.exe",
+            ["/c", "start", '"Mepluh Updater"', "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", updaterScript],
+            { detached: true, stdio: "ignore", windowsVerbatimArguments: true }
         );
         child.unref();
 
-        setTimeout(() => app.exit(0), 250);
+        setTimeout(() => app.exit(0), 300);
         return "updating";
     });
 

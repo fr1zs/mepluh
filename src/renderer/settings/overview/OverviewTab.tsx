@@ -102,10 +102,14 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
                   : "Check For Mepluh Updates";
 
     const updateIcon = updateStatus === "latest" ? "check-circle-filled" : "refresh";
-    const updateClassName =
+    const updateStyle =
         updateStatus === "latest"
-            ? "justify-center !border-emerald-500/40 !bg-emerald-500/15 !text-emerald-400"
-            : "justify-center";
+            ? {
+                  backgroundColor: "rgba(16, 185, 129, 0.16)",
+                  borderColor: "rgba(16, 185, 129, 0.45)",
+                  color: "#34d399"
+              }
+            : undefined;
 
     return (
         <TabPage icon="settings-filled" title={MOD_NAME} description="Overview, quick actions and the toggles you reach for most.">
@@ -129,7 +133,8 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
                     <QuickAction
                         icon={updateIcon}
                         label={updateLabel}
-                        className={updateClassName}
+                        className="justify-center"
+                        {...(updateStyle !== undefined ? { style: updateStyle } : {})}
                         disabled={updateStatus === "checking" || updateStatus === "updating"}
                         onClick={() => void handleUpdateClick()}
                     />

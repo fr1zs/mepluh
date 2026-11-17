@@ -6,6 +6,7 @@ type QuickActionProps = QuickActionTarget & {
     readonly icon: string;
     readonly label: string;
     readonly className?: string;
+    readonly style?: Record<string, string>;
     readonly disabled?: boolean;
 };
 
@@ -17,6 +18,7 @@ export const QuickAction = (props: QuickActionProps) => {
             variant="secondary"
             size="lg"
             className={classes}
+            {...(props.style !== undefined ? { style: props.style } : {})}
             {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
             {...("onClick" in props ? { onClick: props.onClick } : {})}
         >
