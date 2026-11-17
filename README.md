@@ -30,7 +30,7 @@
 Requires Windows (PowerShell) and Medal. ([Bun](https://bun.sh) is installed automatically if missing).
 
 ```sh
-irm [https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1](https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1) | iex
+irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 ```
 
 Open Medal's settings and look for the **Mepluh** section.
