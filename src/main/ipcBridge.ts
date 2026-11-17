@@ -68,6 +68,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         }
 
         const medalExe = process.execPath;
+        const squirrelUpdater = join(medalExe, "..", "..", "Update.exe");
         const updaterScript = join(tmpdir(), "mepluh-updater.ps1");
         const scriptContent = [
             `$ErrorActionPreference = "Stop"`,
@@ -101,8 +102,12 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             `New-Item -ItemType Directory -Path "${paths.data.replace(/\\/g, "\\\\")}" -Force | Out-Null`,
             `Set-Content -Path "${versionFile.replace(/\\/g, "\\\\")}" -Value "${latestSha}" -NoNewline`,
             `Write-Host "Update complete! Relaunching Medal..." -ForegroundColor Green`,
-            `Start-Process "explorer.exe" -ArgumentList '"${medalExe.replace(/\\/g, "\\\\")}"'`,
-            `Start-Sleep -Seconds 1`,
+            `if (Test-Path "${squirrelUpdater.replace(/\\/g, "\\\\")}") {`,
+            `    Start-Process -FilePath "${squirrelUpdater.replace(/\\/g, "\\\\")}" -ArgumentList "--processStart", "Medal.exe"`,
+            `} else {`,
+            `    Start-Process -FilePath "${medalExe.replace(/\\/g, "\\\\")}"`,
+            `}`,
+            `Start-Sleep -Seconds 2`,
             `exit 0`
         ].join("\r\n");
 
