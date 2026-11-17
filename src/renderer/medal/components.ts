@@ -121,7 +121,6 @@ export const componentSources = {
     Icon: ["renderer-icon-assets-provider", "t"],
     Badge: ["renderer-badge", "t"],
     Separator: ["renderer-separator.2", "t"],
-    Link: ["renderer-Link", "t"],
     EmptyState: ["renderer-EmptyState", "t"],
     Skeleton: ["renderer-skeleton", "t"],
     InputGroup: ["renderer-input-group", "t"],
@@ -144,7 +143,7 @@ export const componentSources = {
     Tooltip: ["renderer-useHoverShared", "t"],
     TooltipTrigger: ["renderer-useHoverShared", "r"],
     TooltipContent: ["renderer-useHoverShared", "n"]
-} as const satisfies Record<keyof MedalComponents, Source>;
+} as const satisfies Record<Exclude<keyof MedalComponents, "Link">, Source>;
 
 const isRenderable = (value: unknown): boolean => typeof value === "function" || (typeof value === "object" && value !== null && "$$typeof" in value);
 
@@ -181,7 +180,20 @@ const resolveComponents = async (): Promise<MedalComponents> => {
             }
         })
     );
-    return Object.fromEntries(entries) as unknown as MedalComponents;
+
+    const fallbackLink: MedalComponents["Link"] = ({ href, to, children, className }) =>
+        medalUi().runtime.jsx("a", {
+            href: href ?? to ?? "#",
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: className ?? "text-brand-400 hover:underline cursor-pointer",
+            children
+        });
+
+    return {
+        ...Object.fromEntries(entries),
+        Link: fallbackLink
+    } as unknown as MedalComponents;
 };
 
 let loaded: MedalUi | undefined;

@@ -17,8 +17,6 @@
     "jsxImportSource": "@renderer/medal",
     "skipLibCheck": true,
     "noEmit": true,
-    "baseUrl": ".",
-    "paths": { "@shared/*": ["src/shared/*"], "@plugins": ["src/plugins/index.ts"], "@plugins/*": ["src/plugins/*"], "@main/*": ["src/main/*"], "@renderer/*": ["src/renderer/*"] }
-  },
+    "paths": { "@shared/*": ["./src/shared/*"], "@plugins": ["./src/plugins/index.ts"], "@plugins/*": ["./src/plugins/*"], "@main/*": ["./src/main/*"], "@renderer/*": ["./src/renderer/*"] }  },
   "include": ["src", "scripts"]
 }
