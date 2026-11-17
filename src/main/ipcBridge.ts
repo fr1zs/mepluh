@@ -96,13 +96,14 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             `Remove-Item $zip, $extractTemp -Recurse -Force -ErrorAction SilentlyContinue`,
             `Set-Location $dir`,
             `Write-Host "Installing dependencies and patching Medal..." -ForegroundColor Cyan`,
-            `bun install`,
+            `bun install --no-progress`,
             `bun run inject`,
             `New-Item -ItemType Directory -Path "${paths.data.replace(/\\/g, "\\\\")}" -Force | Out-Null`,
             `Set-Content -Path "${versionFile.replace(/\\/g, "\\\\")}" -Value "${latestSha}" -NoNewline`,
             `Write-Host "Update complete! Relaunching Medal..." -ForegroundColor Green`,
-            `Start-Process -FilePath "${medalExe.replace(/\\/g, "\\\\")}"`,
-            `Start-Sleep -Seconds 2`
+            `Start-Process "explorer.exe" -ArgumentList '"${medalExe.replace(/\\/g, "\\\\")}"'`,
+            `Start-Sleep -Seconds 1`,
+            `exit 0`
         ].join("\r\n");
 
         writeFileSync(updaterScript, scriptContent, "utf8");
