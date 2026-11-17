@@ -41,7 +41,7 @@ div:has(> [data-testid="notification-bell-button"]) {
 export default definePlugin({
     name: "HideOnlineFeatures",
     description:
-        "Hides Home, Games, Events and Premium, the search/chat/notification icons, the Back up button, the More section in My Clips and the empty ad box, and makes the Medal logo untappable.",
+        "Hides Home, Games, Events and Premium, the search/chat/notification icons, and the More section in the Library.",
     category: "Appearance",
     enabledByDefault: true,
     styles: STYLES

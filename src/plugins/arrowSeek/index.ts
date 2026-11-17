@@ -76,7 +76,7 @@ const restoreHints = (): void => {
 
 export default definePlugin({
     name: "ArrowSeek",
-    description: "Left/Right arrow keys skip within the current clip instead of jumping to the previous/next clip, and stops the caption box stealing focus.",
+    description: "Left/Right arrow keys skip 5 seconds in the current clip instead of jumping to the previous/next clip.",
     category: "Experimental",
     enabledByDefault: true,
     options: {
