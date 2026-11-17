@@ -55,11 +55,53 @@ const QuickToggle = ({ manager, plugin }: { readonly manager: RendererPluginMana
 
 export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () => {
     usePluginManager(manager);
-    const { Section, SectionTitle } = medalUi().components;
+    const { React, components } = medalUi();
+    const { Section, SectionTitle } = components;
     const [report] = useAsync(() => MepluhNative.patchReport(), []);
     const enabled = manager.plugins.filter(plugin => manager.settingsOf(plugin).enabled);
     const failures = report.status === "ready" ? report.value.entries.filter(entry => entry.status === "failed").length : "…";
     const applied = report.status === "ready" ? report.value.entries.filter(entry => entry.status === "applied").length : "…";
+
+    const [updateStatus, setUpdateStatus] = React.useState<"idle" | "checking" | "latest" | "updating" | "error">("idle");
+    const resetTimerRef = React.useRef<number | undefined>(undefined);
+
+    React.useEffect(() => {
+        return () => {
+            if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
+        };
+    }, []);
+
+    const handleUpdateClick = async () => {
+        if (updateStatus === "checking" || updateStatus === "updating") return;
+        if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
+
+        setUpdateStatus("checking");
+        try {
+            const result = await MepluhNative.updateMepluh();
+            if (result === "up-to-date") {
+                setUpdateStatus("latest");
+                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 4000);
+            } else {
+                setUpdateStatus("updating");
+            }
+        } catch {
+            setUpdateStatus("error");
+            resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 4000);
+        }
+    };
+
+    const updateLabel =
+        updateStatus === "checking"
+            ? "Checking for updates..."
+            : updateStatus === "latest"
+              ? "Mepluh is currently the latest version"
+              : updateStatus === "updating"
+                ? "Updating Mepluh..."
+                : updateStatus === "error"
+                  ? "Failed to check for updates"
+                  : "Update Mepluh";
+
+    const updateIcon = updateStatus === "latest" ? "check-circle-filled" : "refresh";
 
     return (
         <TabPage icon="settings-filled" title={MOD_NAME} description="Overview, quick actions and the toggles you reach for most.">
@@ -71,13 +113,22 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
                 <StatTile icon="warning-filled" label="Patches failed" value={failures} />
             </div>
             <Section header={<SectionTitle>Quick Actions</SectionTitle>}>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                    <QuickAction icon="refresh" label="Relaunch Medal" onClick={() => void MepluhNative.relaunch()} />
-                    <QuickAction icon="code" label="Edit Custom CSS" to={settingsPath("css")} />
-                    <QuickAction icon="external-link" label="Open custom.css" onClick={() => void runAction(() => MepluhNative.openPath("customCss"), "Opened custom.css")} />
-                    <QuickAction icon="library-filled" label="Open Data Folder" onClick={() => void runAction(() => MepluhNative.openPath("data"), "Opened data folder")} />
-                    <QuickAction icon="shapes" label="Manage Plugins" to={settingsPath("plugins")} />
-                    <QuickAction icon="stats" label="Patch Report" to={settingsPath("patches")} />
+                <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                        <QuickAction icon="refresh" label="Relaunch Medal" onClick={() => void MepluhNative.relaunch()} />
+                        <QuickAction icon="code" label="Edit Custom CSS" to={settingsPath("css")} />
+                        <QuickAction icon="external-link" label="Open custom.css" onClick={() => void runAction(() => MepluhNative.openPath("customCss"), "Opened custom.css")} />
+                        <QuickAction icon="library-filled" label="Open Data Folder" onClick={() => void runAction(() => MepluhNative.openPath("data"), "Opened data folder")} />
+                        <QuickAction icon="shapes" label="Manage Plugins" to={settingsPath("plugins")} />
+                        <QuickAction icon="stats" label="Patch Report" to={settingsPath("patches")} />
+                    </div>
+                    <QuickAction
+                        icon={updateIcon}
+                        label={updateLabel}
+                        className="justify-center"
+                        disabled={updateStatus === "checking" || updateStatus === "updating"}
+                        onClick={() => void handleUpdateClick()}
+                    />
                 </div>
             </Section>
             <Section header={<SectionTitle>Privacy</SectionTitle>}>

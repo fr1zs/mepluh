@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame, type IpcRendererEvent } from "electron";
-import { IpcChannel, type MepluhNative, type MonacoAssets, type MonacoStyles, type PluginEventListener } from "@shared/ipc";
+import { IpcChannel, type MepluhNative, type MonacoAssets, type MonacoStyles, type PluginEventListener, type UpdateResult } from "@shared/ipc";
 import type { PatchReport } from "@shared/patchReport";
 import type { SettingsSnapshot } from "@shared/settings";
 import type { ThemeMeta } from "@shared/themes";
@@ -28,6 +28,7 @@ const native: MepluhNative = {
         set: (plugin, settings) => ipcRenderer.invoke(IpcChannel.SettingsSet, plugin, settings) as Promise<void>
     },
     relaunch: () => ipcRenderer.invoke(IpcChannel.Relaunch) as Promise<void>,
+    updateMepluh: () => ipcRenderer.invoke(IpcChannel.UpdateMepluh) as Promise<UpdateResult>,
     openPath: location => ipcRenderer.invoke(IpcChannel.OpenPath, location) as Promise<void>,
     patchReport: () => ipcRenderer.invoke(IpcChannel.PatchReport) as Promise<PatchReport>,
     loadMonaco,

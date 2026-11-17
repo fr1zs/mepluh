@@ -5,12 +5,21 @@ type QuickActionTarget = { readonly onClick: () => void } | { readonly to: strin
 type QuickActionProps = QuickActionTarget & {
     readonly icon: string;
     readonly label: string;
+    readonly className?: string;
+    readonly disabled?: boolean;
 };
 
 export const QuickAction = (props: QuickActionProps) => {
     const { Button, Icon, Link } = medalUi().components;
+    const classes = ["w-full justify-start gap-2", props.className].filter(Boolean).join(" ");
     const button = (
-        <Button variant="secondary" size="lg" className="w-full justify-start gap-2" {...("onClick" in props ? { onClick: props.onClick } : {})}>
+        <Button
+            variant="secondary"
+            size="lg"
+            className={classes}
+            {...(props.disabled !== undefined ? { disabled: props.disabled } : {})}
+            {...("onClick" in props ? { onClick: props.onClick } : {})}
+        >
             <Icon shape={props.icon} size={18} />
             <span className="truncate">{props.label}</span>
         </Button>
