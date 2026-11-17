@@ -23,25 +23,13 @@
 - 🎮 **Discord Rich Presence.** Broadcast your Medal activity directly to your Discord profile.
 - 🔊 **Unlocked sound alerts.** Access restricted sound alerts right out of the box.
 
-## Install
+## One Command Install
 
-Requires Windows (CMD no admin), Medal and [Bun](https://bun.sh).
+Requires Windows (Powershell), Medal and [Bun](https://bun.sh)
 
 ```sh
-git clone https://github.com/fr1zs/mepluh
-cd mepluh
-bun install
-bun run inject
+irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 ```
-
-*OR, if you dont want to use git:*
-1. Download the whole .zip file, extract it, and store it somewhere safe.
-2. Right-Click inside the folder and "Open in terminal"
-3. Run: 
-```sh 
-bun install
-bun run inject 
-``` 
 
 Open Medal's settings and look for the **Mepluh** section.
 
