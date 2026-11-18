@@ -37,7 +37,7 @@ irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 
 Open Medal's settings and look for the **Mepluh** section.
 
-Mepluh has a built in updater, so when I update it all you have to to is press a button and it should be good to go!  
+Mepluh has a built in updater, so when it updates it all you have to to is press a button and it should be good to go!  
 To remove Mepluh, run `bun run uninject`
 
 ## Plugins
