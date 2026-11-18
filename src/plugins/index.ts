@@ -1,6 +1,7 @@
 import type { PluginDefinition } from "@shared/plugin";
 import arrowSeek from "./arrowSeek";
 import customCss from "./customCss";
+import desktopGameDetect from "./desktopGameDetect";
 import devTools from "./devTools";
 import featureFlags from "./featureFlags";
 import hideOnlineFeatures from "./hideOnlineFeatures";
@@ -14,4 +15,20 @@ import startOnClips from "./startOnClips";
 import unlockSoundAlerts from "./unlockSoundAlerts";
 import windowEffects from "./windowEffects";
 
-export const plugins: readonly PluginDefinition[] = [settings, noAds, noPromotions, hideOnlineFeatures, noTelemetry, noAutoUpdate, featureFlags, customCss, windowEffects, richPresence, unlockSoundAlerts, arrowSeek, startOnClips, devTools];
+export const plugins: readonly PluginDefinition[] = [
+    settings,
+    noAds,
+    noPromotions,
+    hideOnlineFeatures,
+    noTelemetry,
+    noAutoUpdate,
+    featureFlags,
+    customCss,
+    windowEffects,
+    richPresence,
+    unlockSoundAlerts,
+    arrowSeek,
+    desktopGameDetect,
+    startOnClips,
+    devTools
+];
