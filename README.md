@@ -37,7 +37,8 @@ irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 
 Open Medal's settings and look for the **Mepluh** section.
 
-Medal's updater replaces its install folder, so click **Check For Mepluh Updates** inside Medal (or run `bun run inject` / `update.bat` inside `%USERPROFILE%\mepluh`) after Medal updates. To remove Mepluh, run `bun run uninject`.
+Mepluh has a built in updater, so when I update it all you have to to is press a button and it should be good to go!  
+To remove Mepluh, run `bun run uninject`.
 
 ## Plugins
 
