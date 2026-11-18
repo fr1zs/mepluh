@@ -27,8 +27,9 @@
 
 ## One Command Install
 
-Requires Windows (PowerShell) and Medal. ([Bun](https://bun.sh) is installed automatically if missing).
-Run this command in a non-admin Powershell window:
+*Requires Windows (PowerShell) and Medal. ([Bun](https://bun.sh) is installed automatically if missing)*   
+  
+**Run this command in a non-admin Powershell window:**
 
 ```sh
 irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
