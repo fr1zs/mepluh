@@ -1,14 +1,23 @@
 import { definePlugin } from "@shared/plugin";
 
-const AUTOFOCUS_SELECTOR = "#caption-input";
-const USER_INTENT_MS = 400;
+const USER_INTENT_MS = 350;
 const TEXT_INPUT_TYPES = new Set(["text", "search", "email", "url", "tel", "password", "number"]);
 
 let keyHandler: ((event: KeyboardEvent) => void) | undefined;
 let focusHandler: ((event: FocusEvent) => void) | undefined;
 let intentHandler: ((event: Event) => void) | undefined;
+let blurPollTimer: number | undefined;
 
-// A text field only counts as "typing" once it has content, because Medal auto-focuses an empty caption box.
+const isCaptionOrDescriptionBox = (el: HTMLElement): boolean => {
+    if (el.id === "caption-input" || el.id === "description-input") return true;
+    if (!(el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && TEXT_INPUT_TYPES.has(el.type)))) {
+        return false;
+    }
+    const hint = `${el.id} ${el.name} ${el.placeholder} ${el.getAttribute("aria-label") ?? ""}`.toLowerCase();
+    return hint.includes("caption") || hint.includes("description") || hint.includes("title");
+};
+
+// A text field only counts as "typing" once it has content, because Medal auto-focuses an empty caption/description box.
 const isTyping = (target: EventTarget | null): boolean => {
     if (!(target instanceof HTMLElement)) return false;
     if (target.isContentEditable) return (target.textContent ?? "").length > 0;
@@ -91,18 +100,48 @@ export default definePlugin({
         const parsed = Number.parseFloat(options.seconds);
         const step = Number.isFinite(parsed) && parsed > 0 ? parsed : 5;
         let lastUserIntent = 0;
+        let clickedTarget: EventTarget | null = null;
 
-        // Remember when the user clicked or pressed Tab, so we can tell their focus from Medal's auto-focus.
+        // Track direct clicks onto the input itself or Tab key presses so clip clicks don't bypass unfocusing.
         intentHandler = event => {
-            if (event.type === "keydown" && (event as KeyboardEvent).key !== "Tab") return;
+            if (event.type === "keydown") {
+                if ((event as KeyboardEvent).key !== "Tab") return;
+                clickedTarget = null;
+                lastUserIntent = Date.now();
+                return;
+            }
+            clickedTarget = event.target;
             lastUserIntent = Date.now();
         };
 
-        focusHandler = event => {
-            const target = event.target;
-            if (!(target instanceof HTMLElement) || !target.matches(AUTOFOCUS_SELECTOR)) return;
-            if (Date.now() - lastUserIntent < USER_INTENT_MS) return;
+        const shouldAllowFocus = (target: HTMLElement): boolean => {
+            if (Date.now() - lastUserIntent >= USER_INTENT_MS) return false;
+            // Allow if Tab was pressed (clickedTarget === null) or the user actually clicked inside this box
+            return clickedTarget === null || (clickedTarget instanceof Node && target.contains(clickedTarget));
+        };
+
+        const blurIfAutofocused = (target: Element | null): void => {
+            if (!(target instanceof HTMLElement) || !isCaptionOrDescriptionBox(target)) return;
+            if (shouldAllowFocus(target)) return;
             target.blur();
+            target.dispatchEvent(new FocusEvent("blur", { bubbles: false }));
+            target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+            // Medal sometimes re-applies focus on the next animation frame
+            requestAnimationFrame(() => {
+                if (document.activeElement === target && !shouldAllowFocus(target)) {
+                    target.blur();
+                    target.dispatchEvent(new FocusEvent("blur", { bubbles: false }));
+                    target.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+                }
+            });
+        };
+
+        focusHandler = event => {
+            const target = event.target instanceof Element ? event.target : null;
+            if (target instanceof HTMLElement && isCaptionOrDescriptionBox(target) && !shouldAllowFocus(target)) {
+                event.stopImmediatePropagation();
+            }
+            blurIfAutofocused(target);
         };
 
         keyHandler = event => {
@@ -129,6 +168,16 @@ export default definePlugin({
         window.addEventListener("focusin", focusHandler, true);
         window.addEventListener("keydown", keyHandler, true);
 
+        // Unfocus immediately if Medal already focused the box before this plugin started
+        blurIfAutofocused(document.activeElement);
+        blurPollTimer = window.setInterval(() => blurIfAutofocused(document.activeElement), 250);
+        window.setTimeout(() => {
+            if (blurPollTimer !== undefined) {
+                window.clearInterval(blurPollTimer);
+                blurPollTimer = undefined;
+            }
+        }, 4000);
+
         // Medal's footer says arrows "navigate between clips"; make it say what they do now.
         const replacement = `to seek ${step} second${step === 1 ? "" : "s"}`;
         hintObserver = new MutationObserver(mutations => {
@@ -143,6 +192,10 @@ export default definePlugin({
         console.info(`[ArrowSeek] footer hint rewrite is active (${BUILD_MARKER}, ${step}s)`);
     },
     stop() {
+        if (blurPollTimer !== undefined) {
+            window.clearInterval(blurPollTimer);
+            blurPollTimer = undefined;
+        }
         if (intentHandler) {
             window.removeEventListener("pointerdown", intentHandler, true);
             window.removeEventListener("keydown", intentHandler, true);
