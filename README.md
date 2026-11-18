@@ -38,7 +38,7 @@ irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 Open Medal's settings and look for the **Mepluh** section.
 
 Mepluh has a built in updater, so when I update it all you have to to is press a button and it should be good to go!  
-To remove Mepluh, run `bun run uninject`.
+To remove Mepluh, run `bun run uninject`
 
 ## Plugins
 
@@ -61,9 +61,9 @@ To remove Mepluh, run `bun run uninject`.
 
 ## Themes
 
-Drop any `.css` file into `%APPDATA%\Mepluh\themes` and enable it under **Mepluh → Themes**. Online themes work too: paste a link.
+Drop any `.css` file into `%APPDATA%\Mepluh\themes` and enable it under **Mepluh → Themes**. Online themes work too: just paste a link.
 
-Built in: **Catppuccin** (Latte, Frappé, Macchiato, Mocha) and **Transparency**. Change the Catppuccin accent with `:root { --ctp-accent: var(--ctp-pink); }` in Custom CSS.
+Built in: **OLED**, **Transparency**, **AMD Red** and **Catppuccin** (Latte, Macchiato, Mocha). Change the Catppuccin accent with `:root { --ctp-accent: var(--ctp-pink); }` in Custom CSS.
 
 ## ORIGINAL PROJECT
 https://github.com/prettylittlelies/mepluh
