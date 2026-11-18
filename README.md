@@ -33,7 +33,7 @@
 **Run this command in a non-admin Powershell window:**
 
 ```sh
-irm [https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1](https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1) | iex
+irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 ```
 
 Open Medal's settings and look for the **Mepluh** section.
