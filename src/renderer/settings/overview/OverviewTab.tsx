@@ -62,7 +62,9 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
     const failures = report.status === "ready" ? report.value.entries.filter(entry => entry.status === "failed").length : "…";
     const applied = report.status === "ready" ? report.value.entries.filter(entry => entry.status === "applied").length : "…";
 
-    const [updateStatus, setUpdateStatus] = React.useState<"idle" | "checking" | "latest" | "updating" | "error">("idle");
+    const [updateStatus, setUpdateStatus] = React.useState<"idle" | "checking" | "latest" | "available" | "updating" | "error">(
+        () => (MepluhNative.isUpdateAvailable() ? "available" : "idle")
+    );
     const resetTimerRef = React.useRef<number | undefined>(undefined);
 
     React.useEffect(() => {
@@ -75,12 +77,25 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
         if (updateStatus === "checking" || updateStatus === "updating") return;
         if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
 
+        if (updateStatus === "available") {
+            setUpdateStatus("updating");
+            try {
+                await MepluhNative.updateMepluh(true);
+            } catch {
+                setUpdateStatus("error");
+                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 4000);
+            }
+            return;
+        }
+
         setUpdateStatus("checking");
         try {
-            const result = await MepluhNative.updateMepluh();
+            const result = await MepluhNative.updateMepluh(false);
             if (result === "up-to-date") {
                 setUpdateStatus("latest");
                 resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 4000);
+            } else if (result === "available") {
+                setUpdateStatus("available");
             } else {
                 setUpdateStatus("updating");
             }
@@ -95,11 +110,13 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
             ? "Checking for updates..."
             : updateStatus === "latest"
               ? "The latest version of Mepluh is installed."
-              : updateStatus === "updating"
-                ? "Updating Mepluh..."
-                : updateStatus === "error"
-                  ? "Failed to check for updates"
-                  : "Check For Mepluh Updates";
+              : updateStatus === "available"
+                ? "Update available — Click again to install & restart Medal"
+                : updateStatus === "updating"
+                  ? "Updating Mepluh..."
+                  : updateStatus === "error"
+                    ? "Failed to check for updates"
+                    : "Check For Mepluh Updates";
 
     const updateIcon = updateStatus === "latest" ? "check-circle-filled" : "refresh";
     const updateStyle =
@@ -109,7 +126,13 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
                   borderColor: "rgba(16, 185, 129, 0.45)",
                   color: "#34d399"
               }
-            : undefined;
+            : updateStatus === "available"
+              ? {
+                    backgroundColor: "rgba(249, 115, 22, 0.16)",
+                    borderColor: "rgba(249, 115, 22, 0.5)",
+                    color: "#fb923c"
+                }
+              : undefined;
 
     return (
         <TabPage icon="settings-filled" title={MOD_NAME} description="Overview, quick actions and the toggles you reach for most.">

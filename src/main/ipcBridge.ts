@@ -1,6 +1,6 @@
 import { app, ipcMain, net, shell } from "electron";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,6 +32,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     const locations: Readonly<Record<ModLocation, string>> = { data: paths.data, customCss: paths.customCss, themes: paths.themes };
     const rendererSource = readFileSync(paths.renderer, "utf8");
     const versionFile = join(paths.data, ".installed-commit");
+    const availableFile = join(paths.data, ".available-commit");
 
     ipcMain.on(IpcChannel.RendererSource, event => {
         event.returnValue = rendererSource;
@@ -45,6 +46,23 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         event.returnValue = store.current;
     });
 
+    ipcMain.on(IpcChannel.UpdateAvailableGet, event => {
+        if (!existsSync(availableFile)) {
+            event.returnValue = false;
+            return;
+        }
+        const availableSha = readFileSync(availableFile, "utf8").trim();
+        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
+        if (availableSha && availableSha !== installedSha) {
+            event.returnValue = true;
+            return;
+        }
+        try {
+            unlinkSync(availableFile);
+        } catch {}
+        event.returnValue = false;
+    });
+
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));
 
     ipcMain.handle(IpcChannel.Relaunch, () => {
@@ -52,7 +70,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         app.exit(0);
     });
 
-    ipcMain.handle(IpcChannel.UpdateMepluh, async (): Promise<UpdateResult> => {
+    ipcMain.handle(IpcChannel.UpdateMepluh, async (_event, install = false): Promise<UpdateResult> => {
         const res = await net.fetch(GITHUB_COMMIT_API, {
             headers: { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" }
         });
@@ -64,7 +82,18 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
 
         const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
         if (installedSha && installedSha === latestSha) {
+            if (existsSync(availableFile)) {
+                try {
+                    unlinkSync(availableFile);
+                } catch {}
+            }
             return "up-to-date";
+        }
+
+        if (!install) {
+            mkdirSync(paths.data, { recursive: true });
+            writeFileSync(availableFile, latestSha, "utf8");
+            return "available";
         }
 
         const medalExe = process.execPath;
@@ -101,6 +130,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             `bun run inject`,
             `New-Item -ItemType Directory -Path "${paths.data.replace(/\\/g, "\\\\")}" -Force | Out-Null`,
             `Set-Content -Path "${versionFile.replace(/\\/g, "\\\\")}" -Value "${latestSha}" -NoNewline`,
+            `Remove-Item -Path "${availableFile.replace(/\\/g, "\\\\")}" -Force -ErrorAction SilentlyContinue`,
             `Write-Host "Update complete! Relaunching Medal..." -ForegroundColor Green`,
             `$launchCmd = if (Test-Path "${squirrelUpdater.replace(/\\/g, "\\\\")}") {`,
             `    '"${squirrelUpdater.replace(/\\/g, "\\\\")}" --processStart Medal.exe'`,

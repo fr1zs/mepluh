@@ -9,6 +9,7 @@ export const IpcChannel = {
     SettingsSet: "mepluh:settings:set",
     Relaunch: "mepluh:relaunch",
     UpdateMepluh: "mepluh:update-mepluh",
+    UpdateAvailableGet: "mepluh:update-available:get",
     OpenPath: "mepluh:open-path",
     PatchReport: "mepluh:patch-report",
     MonacoAssets: "mepluh:monaco-assets",
@@ -21,7 +22,7 @@ export const IpcChannel = {
     PluginEvent: "mepluh:plugin:event"
 } as const;
 
-export type UpdateResult = "up-to-date" | "updating";
+export type UpdateResult = "up-to-date" | "available" | "updating";
 
 export interface MonacoAssets {
     readonly script: string;
@@ -53,7 +54,8 @@ export interface MepluhNative {
         set(plugin: string, settings: PluginSettings): Promise<void>;
     };
     relaunch(): Promise<void>;
-    updateMepluh(): Promise<UpdateResult>;
+    updateMepluh(install?: boolean): Promise<UpdateResult>;
+    isUpdateAvailable(): boolean;
     openPath(location: ModLocation): Promise<void>;
     patchReport(): Promise<PatchReport>;
     loadMonaco(): Promise<MonacoStyles>;
