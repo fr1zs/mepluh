@@ -52,17 +52,18 @@ const isViewingScreenshot = (): boolean => {
 };
 
 const HINT_PHRASE = "to navigate between clips";
+const SCREENSHOT_HINT_REPLACEMENT = "to navigate between media";
 const MAX_TRACKED_HINTS = 20;
 const MAX_REWRITE_LOGS = 3;
 // The footer hint is one short line of visible text. Never touch code, styles or editable text, or long blocks.
 const SKIP_PARENT_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "NOSCRIPT", "TEMPLATE"]);
 const MAX_HINT_NODE_LENGTH = 200;
-const BUILD_MARKER = "footer-hint-v6";
+const BUILD_MARKER = "footer-hint-v8";
 
 let rewriteLogs = 0;
 
 let hintObserver: MutationObserver | undefined;
-// Remembers each rewritten text node's original text so it can be put back when viewing a screenshot or turned off.
+// Remembers each rewritten text node's original text so it can be restored when the plugin is turned off.
 const originalHints = new Map<Text, string>();
 
 const pruneDisconnectedHints = (): void => {
@@ -106,14 +107,10 @@ const rewriteHintsWithin = (root: Node, replacement: string): void => {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) rewriteHintText(node as Text, replacement);
 };
 
-const syncFooterHints = (replacement: string): void => {
-    if (isViewingScreenshot()) {
-        revertTrackedHints();
-        return;
-    }
-    if (document.documentElement) {
-        rewriteHintsWithin(document.documentElement, replacement);
-    }
+const syncFooterHints = (clipReplacement: string): void => {
+    if (!document.documentElement) return;
+    const activeReplacement = isViewingScreenshot() ? SCREENSHOT_HINT_REPLACEMENT : clipReplacement;
+    rewriteHintsWithin(document.documentElement, activeReplacement);
 };
 
 const restoreHints = (): void => {
@@ -219,13 +216,12 @@ export default definePlugin({
             }
         }, 4000);
 
-        // Medal's footer says arrows "navigate between clips"; only rewrite it when viewing a clip (not a screenshot).
-        const replacement = `to seek ${step} second${step === 1 ? "" : "s"}`;
+        const clipReplacement = `to seek ${step} second${step === 1 ? "" : "s"}`;
         hintObserver = new MutationObserver(() => {
-            syncFooterHints(replacement);
+            syncFooterHints(clipReplacement);
         });
         hintObserver.observe(document, { childList: true, subtree: true, characterData: true });
-        syncFooterHints(replacement);
+        syncFooterHints(clipReplacement);
         console.info(`[ArrowSeek] footer hint rewrite is active (${BUILD_MARKER}, ${step}s)`);
     },
     stop() {
