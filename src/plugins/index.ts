@@ -11,6 +11,7 @@ import noAutoUpdate from "./noAutoUpdate";
 import noPromotions from "./noPromotions";
 import noTelemetry from "./noTelemetry";
 import richPresence from "./richPresence";
+import screenshotZoom from "./screenshotZoom";
 import settings from "./settings";
 import startOnClips from "./startOnClips";
 import unlockSoundAlerts from "./unlockSoundAlerts";
@@ -29,6 +30,7 @@ export const plugins: readonly PluginDefinition[] = [
     richPresence,
     unlockSoundAlerts,
     arrowSeek,
+    screenshotZoom,
     desktopGameDetect,
     keepEditsInGameFolder,
     startOnClips,

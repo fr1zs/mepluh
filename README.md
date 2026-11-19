@@ -1,3 +1,4 @@
+```markdown
 [![Mepluh](assets/banner.svg)](https://github.com/fr1zs/mepluh)
 
 <p align="center"><b>A fix for Mepluh, a mod for Medal</b></p>
@@ -20,6 +21,7 @@
 - 🫧 **Liquid Glass.** Refractive, light-reactive glass with Windows 11 Acrylic and Mica backdrops.
 - ✏️ **Custom CSS.** A built-in Monaco editor with autocomplete and live preview.
 - ⏩ **Arrow seeking.** Scrub through clips using the keyboard arrow keys.
+- 🔍 **Screenshot zoom.** Zoom and pan into screenshots instead of copying on click.
 - 🎬 **Start on clips.** Launch straight into your clips library on startup instead of the home feed.
 - 🖥️ **Desktop game detection.** Categorizes Screen Recording clips under the running game, if any.
 - 📂 **Keep edits in game folder.** Keeps edited clips inside the game folder instead of the Edits folder.
@@ -35,11 +37,13 @@
 
 ```sh
 irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
+
 ```
 
 Open Medal's settings and look for the **Mepluh** section.
 
-Mepluh has a built in updater, so when it updates it all you have to to is press a button and it should be good to go!  
+Mepluh has a built in updater, so when it updates it all you have to to is press a button and it should be good to go!
+
 To remove Mepluh, run `bun run uninject`
 
 ## Plugins
@@ -54,6 +58,7 @@ To remove Mepluh, run `bun run uninject`
 | FeatureFlags | Overrides Medal's feature flags. |
 | DevTools | Opens DevTools with F12 or Ctrl+Shift+I. |
 | ArrowSeek | Seeks forward and backward in clips using the arrow keys. |
+| ScreenshotZoom | Zooms and pans into screenshots on click or scroll instead of copying, and adds a copy button. |
 | StartOnClips | Opens directly to your clips library on launch and prevents home-page redirects. |
 | DesktopGameDetect | Categorizes Screen Recording clips under the running game whenever Medal detects a game alongside desktop capture. |
 | KeepEditsInGameFolder | Saves trimmed and edited clips in the original clip's game folder instead of moving them to the Edits folder. |

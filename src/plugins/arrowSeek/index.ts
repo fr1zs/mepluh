@@ -42,27 +42,58 @@ const findVideo = (): HTMLVideoElement | undefined => {
     return videos.find(video => !video.paused) ?? videos.sort((a, b) => visibleArea(b) - visibleArea(a))[0];
 };
 
+const isViewingScreenshot = (): boolean => {
+    if (document.querySelector('[class*="group/screenshot"]') !== null) return true;
+    const playerSection = document.querySelector(".playerSection");
+    if (playerSection && playerSection.querySelector("video") === null && playerSection.querySelector("img") !== null) {
+        return true;
+    }
+    return false;
+};
+
 const HINT_PHRASE = "to navigate between clips";
 const MAX_TRACKED_HINTS = 20;
 const MAX_REWRITE_LOGS = 3;
 // The footer hint is one short line of visible text. Never touch code, styles or editable text, or long blocks.
 const SKIP_PARENT_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "NOSCRIPT", "TEMPLATE"]);
 const MAX_HINT_NODE_LENGTH = 200;
-const BUILD_MARKER = "footer-hint-v5";
+const BUILD_MARKER = "footer-hint-v6";
 
 let rewriteLogs = 0;
 
 let hintObserver: MutationObserver | undefined;
-// Remembers each rewritten text node's original text so it can be put back when the plugin is turned off.
+// Remembers each rewritten text node's original text so it can be put back when viewing a screenshot or turned off.
 const originalHints = new Map<Text, string>();
+
+const pruneDisconnectedHints = (): void => {
+    for (const tracked of originalHints.keys()) {
+        if (!tracked.isConnected) originalHints.delete(tracked);
+    }
+};
+
+const revertTrackedHints = (): void => {
+    for (const [node, original] of originalHints) {
+        if (node.isConnected && node.nodeValue !== original) {
+            node.nodeValue = original;
+        }
+    }
+};
 
 const rewriteHintText = (node: Text, replacement: string): void => {
     const value = node.nodeValue;
-    if (!value || value.length > MAX_HINT_NODE_LENGTH || !value.includes(HINT_PHRASE)) return;
+    if (!value || value.length > MAX_HINT_NODE_LENGTH) return;
     if (node.parentElement && SKIP_PARENT_TAGS.has(node.parentElement.tagName)) return;
-    if (originalHints.size > MAX_TRACKED_HINTS) {
-        for (const tracked of originalHints.keys()) if (!tracked.isConnected) originalHints.delete(tracked);
+
+    const trackedOriginal = originalHints.get(node);
+    if (trackedOriginal !== undefined) {
+        const expected = trackedOriginal.replace(HINT_PHRASE, replacement);
+        if (node.nodeValue !== expected) node.nodeValue = expected;
+        return;
     }
+
+    if (!value.includes(HINT_PHRASE)) return;
+    if (originalHints.size > MAX_TRACKED_HINTS) pruneDisconnectedHints();
+
     originalHints.set(node, value);
     node.nodeValue = value.replace(HINT_PHRASE, replacement);
     if (rewriteLogs++ < MAX_REWRITE_LOGS) console.info(`[ArrowSeek] rewrote the footer hint -> "${node.nodeValue}"`);
@@ -75,10 +106,20 @@ const rewriteHintsWithin = (root: Node, replacement: string): void => {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) rewriteHintText(node as Text, replacement);
 };
 
+const syncFooterHints = (replacement: string): void => {
+    if (isViewingScreenshot()) {
+        revertTrackedHints();
+        return;
+    }
+    if (document.documentElement) {
+        rewriteHintsWithin(document.documentElement, replacement);
+    }
+};
+
 const restoreHints = (): void => {
     hintObserver?.disconnect();
     hintObserver = undefined;
-    for (const [node, original] of originalHints) if (node.isConnected) node.nodeValue = original;
+    revertTrackedHints();
     originalHints.clear();
     rewriteLogs = 0;
 };
@@ -178,17 +219,13 @@ export default definePlugin({
             }
         }, 4000);
 
-        // Medal's footer says arrows "navigate between clips"; make it say what they do now.
+        // Medal's footer says arrows "navigate between clips"; only rewrite it when viewing a clip (not a screenshot).
         const replacement = `to seek ${step} second${step === 1 ? "" : "s"}`;
-        hintObserver = new MutationObserver(mutations => {
-            for (const mutation of mutations) {
-                if (mutation.type === "characterData") rewriteHintsWithin(mutation.target, replacement);
-                else mutation.addedNodes.forEach(added => rewriteHintsWithin(added, replacement));
-            }
+        hintObserver = new MutationObserver(() => {
+            syncFooterHints(replacement);
         });
-        // Plugins start very early, before <html> exists, so watch the document itself (it always exists).
         hintObserver.observe(document, { childList: true, subtree: true, characterData: true });
-        if (document.documentElement) rewriteHintsWithin(document.documentElement, replacement);
+        syncFooterHints(replacement);
         console.info(`[ArrowSeek] footer hint rewrite is active (${BUILD_MARKER}, ${step}s)`);
     },
     stop() {
