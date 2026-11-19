@@ -1,4 +1,3 @@
-```markdown
 [![Mepluh](assets/banner.svg)](https://github.com/fr1zs/mepluh)
 
 <p align="center"><b>A fix for Mepluh, a mod for Medal</b></p>
