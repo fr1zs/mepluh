@@ -45,7 +45,7 @@ Mepluh has a built in updater, so when it updates it all you have to to is press
 
 To remove Mepluh, run `bun run uninject`
 
-## Plugins
+## Plugins (17)
 
 | Plugin | What it does |
 | --- | --- |
