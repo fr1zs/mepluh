@@ -5,6 +5,7 @@ import desktopGameDetect from "./desktopGameDetect";
 import devTools from "./devTools";
 import featureFlags from "./featureFlags";
 import hideOnlineFeatures from "./hideOnlineFeatures";
+import keepEditsInGameFolder from "./keepEditsInGameFolder";
 import noAds from "./noAds";
 import noAutoUpdate from "./noAutoUpdate";
 import noPromotions from "./noPromotions";
@@ -29,6 +30,7 @@ export const plugins: readonly PluginDefinition[] = [
     unlockSoundAlerts,
     arrowSeek,
     desktopGameDetect,
+    keepEditsInGameFolder,
     startOnClips,
     devTools
 ];

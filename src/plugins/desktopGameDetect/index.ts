@@ -2,7 +2,7 @@ import { definePlugin } from "@shared/plugin";
 
 export default definePlugin({
     name: "DesktopGameDetect",
-    description: "Categorizes Screen Recording clips under the running game whenever Medal detects a game alongside desktop capture, and moves the clip into the game's folder.",
+    description: "Categorizes Screen Recording clips under the running game whenever Medal detects a game alongside desktop capture.",
     category: "Experimental",
     enabledByDefault: true,
     mainPatches: [

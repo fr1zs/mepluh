@@ -22,6 +22,7 @@
 - ⏩ **Arrow seeking.** Scrub through clips effortlessly using your keyboard's arrow keys.
 - 🎬 **Start on clips.** Launch straight into your clips library on startup instead of the home feed.
 - 🖥️ **Desktop game detection.** Automatically categorizes Screen Recording clips under the running game while keeping desktop capture intact.
+- 📂 **Keep edits in game folder.** Saves trimmed and edited clips directly inside the original clip's game folder instead of the Edits folder.
 - 🔌 **Offline focus.** Strip away social feeds and online clutter, and lock down auto-updates.
 - 🎮 **Discord Rich Presence.** Broadcast your Medal activity directly to your Discord profile.
 - 🔊 **Unlocked sound alerts.** Access restricted sound alerts right out of the box.
@@ -33,7 +34,7 @@
 **Run this command in a non-admin Powershell window:**
 
 ```sh
-irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
+irm [https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1](https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1) | iex
 ```
 
 Open Medal's settings and look for the **Mepluh** section.
@@ -55,6 +56,7 @@ To remove Mepluh, run `bun run uninject`
 | ArrowSeek | Seeks forward and backward in clips using the arrow keys. |
 | StartOnClips | Opens directly to your clips library on launch and prevents home-page redirects. |
 | DesktopGameDetect | Categorizes Screen Recording clips under the running game whenever Medal detects a game alongside desktop capture. |
+| KeepEditsInGameFolder | Saves trimmed and edited clips in the original clip's game folder instead of moving them to the Edits folder. |
 | HideOnlineFeatures | Hides social, feed, and online-only tabs for a local-first experience. |
 | NoAutoUpdate | Prevents Medal from automatically downloading and installing updates. |
 | RichPresence | Displays your current Medal activity on Discord Rich Presence. |
