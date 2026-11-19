@@ -17,7 +17,7 @@ export default definePlugin({
                 {
                     match: /(let (\i)=\i,(\i)=\i;)(if\(\2&&(\i)!=="session"\|\|\3\)\{const \i=await \i\(\i\.FileRename\);)/,
                     replace:
-                        '$1if(N&&$5!=="session"&&String(r)!=="4533"&&String(r)!=="1b7CpvXVSuB"){try{const _gn=(await gg(r))?.categoryName??s,_dir=ze.default.dirname(N),_base=ze.default.basename(_dir).toLowerCase();if(_gn&&(_base==="screen recording"||_base==="screen capture"||_base==="desktop capture")){const _safe=IG(_gn).trim();if(_safe){const _targetDir=ze.default.join(ze.default.dirname(_dir),_safe);await St.default.mkdir(_targetDir,{recursive:!0});const _dest=await Nl(ze.default.join(_targetDir,ze.default.basename(N)));await St.default.rename(N,_dest);N=_dest;$2&&($2=N);$3&&($3=N)}}}catch{}}$4'
+                        '$1if(N&&$5!=="session"&&String(r)!=="4533"&&String(r)!=="1b7CpvXVSuB"){try{const _gn=(await gg(r))?.categoryName??s,_dir=ze.default.dirname(N),_base=ze.default.basename(_dir).toLowerCase();if(_gn&&(_base==="screen recording"||_base==="screen capture"||_base==="desktop capture")){const _safe=IG(_gn).trim();if(_safe){const _targetDir=ze.default.join(ze.default.dirname(_dir),_safe);await St.default.mkdir(_targetDir,{recursive:!0});const _compact=_safe.replace(/[^a-zA-Z0-9]/g,""),_origName=ze.default.basename(N),_newName=_compact?_origName.replace(/^MedalTV(?:ScreenRecording|ScreenCapture|DesktopCapture)(?=\\d)/i,"MedalTV"+_compact):_origName;const _dest=await Nl(ze.default.join(_targetDir,_newName));await St.default.rename(N,_dest);N=_dest;$2&&($2=N);$3&&($3=N)}}}catch{}}$4'
                 }
             ]
         }
