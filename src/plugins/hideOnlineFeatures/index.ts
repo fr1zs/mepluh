@@ -20,6 +20,11 @@ button:has(> [data-shape="clip-sync-back-up"]) {
     display: none !important;
 }
 
+/* Hide "Sync to Cloud" in the clip context menu */
+[role="menuitem"]:has([data-shape="medal-premium"]) {
+    display: none !important;
+}
+
 /* Hide the whole "More" section in My Clips (Liked, Saved, Clips You Are In, Sent by friends, Watch History) */
 [data-slot="sidebar-group"]:has(a[href="/library/liked"], a[href="/library/watch-history"]) {
     display: none !important;
