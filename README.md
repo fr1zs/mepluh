@@ -12,18 +12,18 @@
 
 ## Features
 
-- 🚫 **No ads.** Every ad slot, sponsored card and promo campaign is gone.
+- 🚫 **No ads.** Every ad slot, sponsored card and promo campaign removed.
 - 🕵️ **No telemetry.** Analytics, session replay and crash reporting are blocked.
 - ⚙️ **Native settings.** Mepluh lives inside Medal's own settings, built with Medal's own components.
-- 🔄 **One-click updates.** Check for updates and patch Medal straight from the Mepluh settings tab without Git.
-- 🎨 **Themes.** Catppuccin, Transparency, your own `.css` files or any theme URL, applied live.
+- 🔄 **One-click updates.** Check for updates and patch Medal straight from the Mepluh settings tab.
+- 🎨 **Themes.** Catppuccin, AMD, Transparency, your own `.css` files or any theme URL, applied live.
 - 🫧 **Liquid Glass.** Refractive, light-reactive glass with Windows 11 Acrylic and Mica backdrops.
 - ✏️ **Custom CSS.** A built-in Monaco editor with autocomplete and live preview.
-- ⏩ **Arrow seeking.** Scrub through clips effortlessly using your keyboard's arrow keys.
+- ⏩ **Arrow seeking.** Scrub through clips using the keyboard arrow keys.
 - 🎬 **Start on clips.** Launch straight into your clips library on startup instead of the home feed.
-- 🖥️ **Desktop game detection.** Automatically categorizes Screen Recording clips under the running game while keeping desktop capture intact.
-- 📂 **Keep edits in game folder.** Saves trimmed and edited clips directly inside the original clip's game folder instead of the Edits folder.
-- 🔌 **Offline focus.** Strip away social feeds and online clutter, and lock down auto-updates.
+- 🖥️ **Desktop game detection.** Categorizes Screen Recording clips under the running game, if any.
+- 📂 **Keep edits in game folder.** Keeps edited clips inside the game folder instead of the Edits folder.
+- 🔌 **Clips Only.** Strip away social feeds and online clutter.
 - 🎮 **Discord Rich Presence.** Broadcast your Medal activity directly to your Discord profile.
 - 🔊 **Unlocked sound alerts.** Access restricted sound alerts right out of the box.
 
