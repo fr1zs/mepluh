@@ -25,7 +25,7 @@ export default definePlugin({
             replacement: { match: /\i\("ads-enabled",!0\)/, replace: "!1" }
         },
         {
-            find: chunkMarker("renderer-LibraryAdsWrapper"),
+            find: chunkMarker("renderer-LibraryClips"),
             replacement: { match: /\?\.data\?\.skipAds===!1/, replace: "&&!1" }
         }
     ],

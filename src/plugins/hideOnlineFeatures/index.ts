@@ -36,11 +36,6 @@ div[aria-disabled]:has(> [data-shape="chat-and-comments"]),
 div:has(> [data-testid="notification-bell-button"]) {
     display: none !important;
 }
-
-/* Remove the empty ad placeholder from the clip grid */
-[data-library-item="true"]:has(> div:only-child:empty):not(:has([data-own-border], .preview)) {
-    display: none !important;
-}
 `;
 
 export default definePlugin({

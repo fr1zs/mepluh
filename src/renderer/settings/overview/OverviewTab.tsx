@@ -11,6 +11,11 @@ import { RestartNotice } from "../ui/RestartNotice";
 import { StatTile } from "../ui/StatTile";
 import { TabPage } from "../ui/TabPage";
 
+const THREE_COL_GRID = {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))"
+} as const;
+
 const Hero = ({ enabled, total }: { readonly enabled: number; readonly total: number }) => {
     const { Badge, Icon } = medalUi().components;
     return (
@@ -138,14 +143,14 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
         <TabPage icon="settings-filled" title={MOD_NAME} description="Overview, quick actions and the toggles you reach for most.">
             <Hero enabled={enabled.length} total={manager.plugins.length} />
             <RestartNotice manager={manager} />
-            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="w-full gap-3" style={THREE_COL_GRID}>
                 <StatTile icon="shapes-filled" label="Plugins enabled" value={`${enabled.length}/${manager.plugins.length}`} />
                 <StatTile icon="check-circle-filled" label="Patches applied" value={applied} />
                 <StatTile icon="warning-filled" label="Patches failed" value={failures} />
             </div>
             <Section header={<SectionTitle>Quick Actions</SectionTitle>}>
                 <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <div className="gap-2" style={THREE_COL_GRID}>
                         <QuickAction icon="refresh" label="Relaunch Medal" onClick={() => void MepluhNative.relaunch()} />
                         <QuickAction icon="code" label="Edit Custom CSS" to={settingsPath("css")} />
                         <QuickAction icon="external-link" label="Open custom.css" onClick={() => void runAction(() => MepluhNative.openPath("customCss"), "Opened custom.css")} />

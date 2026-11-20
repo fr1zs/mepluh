@@ -9,6 +9,11 @@ import { Card } from "../ui/Card";
 import { QuickAction } from "../ui/QuickAction";
 import { ThemeCard } from "./ThemeCard";
 
+const THREE_COL_GRID = {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))"
+} as const;
+
 const GROUPS: readonly { readonly source: ThemeSource; readonly title: string }[] = [
     { source: "builtin", title: "Built-in Themes" },
     { source: "local", title: "Your Themes" }
@@ -82,7 +87,7 @@ export const LocalThemes = ({ context }: { readonly context: SettingsContext }) 
         <>
             <FindThemes />
             <Section header={<SectionTitle>Quick Actions</SectionTitle>}>
-                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <div className="gap-2" style={THREE_COL_GRID}>
                     <QuickAction icon="library-filled" label="Open Themes Folder" onClick={() => void runAction(() => MepluhNative.openPath("themes"), "Opened themes folder")} />
                     <QuickAction icon="refresh" label="Reload Themes" onClick={() => void runAction(() => themes.refresh(), "Themes reloaded")} />
                     <QuickAction icon="code" label="Edit Custom CSS" to={settingsPath("css")} />

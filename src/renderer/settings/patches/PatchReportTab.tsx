@@ -7,6 +7,11 @@ import { TabPage } from "../ui/TabPage";
 
 const ALL = "all";
 
+const THREE_COL_GRID = {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))"
+} as const;
+
 const EntryRow = ({ entry }: { readonly entry: PatchReportEntry }) => {
     const { Row, Label, Description, Badge } = medalUi().components;
     return (
@@ -56,7 +61,7 @@ const ReportBody = ({ entries, onRefresh }: { readonly entries: readonly PatchRe
 
     return (
         <>
-            <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="w-full gap-3" style={THREE_COL_GRID}>
                 <StatTile icon="layout" label="Patched chunks" value={new Set(entries.map(entry => entry.file)).size} />
                 <StatTile icon="check-circle-filled" label="Applied" value={entries.filter(entry => entry.status === "applied").length} />
                 <StatTile icon="warning-filled" label="Failed" value={entries.filter(entry => entry.status === "failed").length} />
