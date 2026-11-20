@@ -1,5 +1,6 @@
 import { Logger } from "@shared/logger";
 import { plugins } from "@plugins";
+import { checkAndShowPendingChangelog } from "./changelogModal";
 import { RendererPluginManager } from "./pluginManager";
 import { createSettingsRouteLoader } from "./settings/route";
 import { ThemeManager } from "./themeManager";
@@ -16,4 +17,5 @@ globalThis.Mepluh = Object.freeze({
 
 manager.startEnabled();
 themes.start().catch((error: unknown) => log.error("Failed to start themes", error));
+checkAndShowPendingChangelog().catch((error: unknown) => log.error("Failed to show changelog", error));
 log.info(`v${MEPLUH_VERSION} ready`);

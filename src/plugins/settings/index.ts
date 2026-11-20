@@ -73,7 +73,6 @@ const syncUpdateBadges = (available: boolean): void => {
             '[data-slot="standard-icon"][data-shape="settings-filled"], [data-slot="standard-icon"][data-shape="settings"]'
         );
         for (const icon of settingsIcons) {
-            // Skip the large icon inside the OverviewTab header
             if (icon.closest('[data-slot="tab-page"]')) continue;
             const wrapper = icon.closest<HTMLElement>("div.grid, button, a") ?? icon.parentElement;
             if (!wrapper) continue;

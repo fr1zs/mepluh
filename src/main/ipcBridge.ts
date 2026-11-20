@@ -4,7 +4,14 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { IpcChannel, type ModLocation, type MonacoAssets, type UpdateResult } from "@shared/ipc";
+import {
+    IpcChannel,
+    type ChangelogCommit,
+    type ModLocation,
+    type MonacoAssets,
+    type PendingChangelog,
+    type UpdateResult
+} from "@shared/ipc";
 import type { PatchReport } from "@shared/patchReport";
 import type { PluginSettings } from "@shared/settings";
 import type { ThemeSettings } from "@shared/themes";
@@ -14,8 +21,19 @@ import type { SettingsStore } from "./settingsStore";
 import type { ThemeService } from "./themes/themeService";
 
 const GITHUB_COMMIT_API = "https://api.github.com/repos/fr1zs/mepluh/commits/main";
+const GITHUB_REPO_API = "https://api.github.com/repos/fr1zs/mepluh";
 const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zip";
 const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+
+interface GitHubCommitItem {
+    readonly sha?: string;
+    readonly commit?: {
+        readonly message?: string;
+        readonly author?: {
+            readonly date?: string;
+        };
+    };
+}
 
 export interface PatchReportSource {
     readonly report: PatchReport;
@@ -29,12 +47,51 @@ export interface IpcServices {
     readonly themes: ThemeService;
 }
 
+const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
+    const sha = item.sha?.trim().slice(0, 7) ?? "";
+    const rawMessage = item.commit?.message?.trim() ?? "";
+    if (!rawMessage) return null;
+
+    const lines = rawMessage.split(/\r?\n/);
+    const title = (lines[0] ?? "").trim();
+    const body = lines.slice(1).join("\n").trim();
+    const date = item.commit?.author?.date ?? "";
+
+    return { sha, title, body, date };
+};
+
+const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCommit[]> => {
+    const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
+    const all: ChangelogCommit[] = [];
+
+    for (let page = 1; page <= 10; page++) {
+        try {
+            const res = await net.fetch(`${GITHUB_REPO_API}/commits?sha=${toSha}&per_page=100&page=${page}`, { headers });
+            if (!res.ok) break;
+            const listData = (await res.json()) as readonly GitHubCommitItem[];
+            if (!Array.isArray(listData) || listData.length === 0) break;
+
+            for (const item of listData) {
+                const parsed = parseGitHubCommit(item);
+                if (parsed) all.push(parsed);
+            }
+
+            if (listData.length < 100) break;
+        } catch {
+            break;
+        }
+    }
+
+    return all;
+};
+
 export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: IpcServices): void => {
     const locations: Readonly<Record<ModLocation, string>> = { data: paths.data, customCss: paths.customCss, themes: paths.themes };
     const rendererSource = readFileSync(paths.renderer, "utf8");
     const versionFile = join(paths.data, ".installed-commit");
     const availableFile = join(paths.data, ".available-commit");
     const lastCheckFile = join(paths.data, ".last-update-check");
+    const pendingChangelogFile = join(paths.data, ".pending-changelog.json");
 
     const broadcastUpdateAvailable = (available: boolean): void => {
         for (const win of BrowserWindow.getAllWindows()) {
@@ -124,6 +181,21 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         event.returnValue = readUpdateAvailable();
     });
 
+    ipcMain.handle(IpcChannel.ConsumeChangelog, (): PendingChangelog | null => {
+        if (!existsSync(pendingChangelogFile)) return null;
+        try {
+            const raw = readFileSync(pendingChangelogFile, "utf8");
+            unlinkSync(pendingChangelogFile);
+            const parsed = JSON.parse(raw) as PendingChangelog;
+            return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? parsed : null;
+        } catch {
+            try {
+                unlinkSync(pendingChangelogFile);
+            } catch {}
+            return null;
+        }
+    });
+
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));
 
     ipcMain.handle(IpcChannel.Relaunch, () => {
@@ -135,6 +207,18 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         const { status, latestSha } = await checkForUpdates();
         if (status === "up-to-date") return "up-to-date";
         if (!install) return "available";
+
+        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
+        const commits = await fetchAllCommitsUpTo(latestSha);
+        if (commits.length > 0) {
+            mkdirSync(paths.data, { recursive: true });
+            const payload: PendingChangelog = {
+                fromSha: installedSha.slice(0, 7),
+                toSha: latestSha.slice(0, 7),
+                commits
+            };
+            writeFileSync(pendingChangelogFile, JSON.stringify(payload), "utf8");
+        }
 
         const medalExe = process.execPath;
         const squirrelUpdater = join(medalExe, "..", "..", "Update.exe");
