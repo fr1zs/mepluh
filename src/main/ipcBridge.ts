@@ -21,6 +21,7 @@ import type { SettingsStore } from "./settingsStore";
 import type { ThemeService } from "./themes/themeService";
 
 const GITHUB_COMMIT_API = "https://api.github.com/repos/fr1zs/mepluh/commits/main";
+const GITHUB_COMMIT_ATOM = "https://github.com/fr1zs/mepluh/commits/main.atom";
 const GITHUB_REPO_API = "https://api.github.com/repos/fr1zs/mepluh";
 const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zip";
 const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -55,6 +56,33 @@ const isIgnoredDocsFile = (filename: string): boolean => {
 const isReadmeOnlyTitle = (title: string): boolean => {
     const normalized = title.trim().toLowerCase();
     return /^(update|edit|fix|docs?|chore)?\s*(\(.+\))?:?\s*readme(\.md)?$/i.test(normalized);
+};
+
+const fetchLatestMainSha = async (): Promise<string> => {
+    const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
+
+    // 1. Try GitHub REST API first
+    try {
+        const res = await net.fetch(GITHUB_COMMIT_API, { headers });
+        if (res.ok) {
+            const data = (await res.json()) as { sha?: string };
+            const sha = data.sha?.trim();
+            if (sha) return sha;
+        }
+    } catch {}
+
+    // 2. Fallback to GitHub's Atom feed (not subject to the 60/hr REST API rate limit)
+    const atomRes = await net.fetch(GITHUB_COMMIT_ATOM, {
+        headers: { "User-Agent": "Mepluh-Updater", Accept: "application/atom+xml" }
+    });
+    if (!atomRes.ok) {
+        throw new Error(`GitHub check failed (${atomRes.status})`);
+    }
+    const xml = await atomRes.text();
+    const match = xml.match(/<id>tag:github\.com,2008:Grit::Commit\/([0-9a-f]{40})<\/id>/i);
+    const sha = match?.[1]?.trim();
+    if (!sha) throw new Error("Unable to read latest version from GitHub");
+    return sha;
 };
 
 const hasCodeChangesBetween = async (fromSha: string, toSha: string): Promise<boolean> => {
@@ -96,6 +124,27 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     return { title, body, date };
 };
 
+const parseAtomCommits = (xml: string): ChangelogCommit[] => {
+    const entries = xml.match(/<entry>[\s\S]*?<\/entry>/g) ?? [];
+    const results: ChangelogCommit[] = [];
+
+    for (const entry of entries) {
+        const titleRaw = entry.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "";
+        const dateRaw = entry.match(/<updated>([\s\S]*?)<\/updated>/)?.[1] ?? "";
+        const title = titleRaw
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#39;/g, "'")
+            .trim();
+        if (!title || isReadmeOnlyTitle(title)) continue;
+        results.push({ title, body: "", date: dateRaw.trim() });
+    }
+
+    return results;
+};
+
 const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCommit[]> => {
     const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
 
@@ -105,7 +154,17 @@ const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCom
         net.fetch(`${GITHUB_REPO_API}/commits?path=README.md&sha=${toSha}&per_page=100`, { headers }).catch(() => null)
     ]);
 
-    if (!allRes || !allRes.ok) return [];
+    // If API is rate-limited, fall back to the Atom feed so the changelog still populates
+    if (!allRes || !allRes.ok) {
+        try {
+            const atomRes = await net.fetch(GITHUB_COMMIT_ATOM, {
+                headers: { "User-Agent": "Mepluh-Updater", Accept: "application/atom+xml" }
+            });
+            if (atomRes.ok) return parseAtomCommits(await atomRes.text());
+        } catch {}
+        return [];
+    }
+
     const rawItems = (await allRes.json()) as readonly GitHubCommitItem[];
     if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
 
@@ -176,14 +235,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     };
 
     const checkForUpdates = async (): Promise<{ status: "up-to-date" | "available"; latestSha: string }> => {
-        const res = await net.fetch(GITHUB_COMMIT_API, {
-            headers: { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" }
-        });
-        if (!res.ok) throw new Error(`GitHub check failed (${res.status})`);
-
-        const data = (await res.json()) as { sha?: string };
-        const latestSha = data.sha?.trim();
-        if (!latestSha) throw new Error("Unable to read latest version from GitHub");
+        const latestSha = await fetchLatestMainSha();
 
         mkdirSync(paths.data, { recursive: true });
         writeFileSync(lastCheckFile, String(Date.now()), "utf8");
