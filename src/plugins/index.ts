@@ -10,6 +10,7 @@ import noAds from "./noAds";
 import noAutoUpdate from "./noAutoUpdate";
 import noPromotions from "./noPromotions";
 import noTelemetry from "./noTelemetry";
+import offlinePlayback from "./offlinePlayback";
 import richPresence from "./richPresence";
 import screenshotZoom from "./screenshotZoom";
 import settings from "./settings";
@@ -33,6 +34,7 @@ export const plugins: readonly PluginDefinition[] = [
     screenshotZoom,
     desktopGameDetect,
     keepEditsInGameFolder,
+    offlinePlayback,
     startOnClips,
     devTools
 ];
