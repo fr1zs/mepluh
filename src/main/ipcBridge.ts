@@ -25,6 +25,11 @@ const GITHUB_COMMIT_ATOM = "https://github.com/fr1zs/mepluh/commits/main.atom";
 const GITHUB_REPO_API = "https://api.github.com/repos/fr1zs/mepluh";
 const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zip";
 const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const CHANGELOG_CACHE_VERSION = 2;
+
+interface CachedChangelogFile extends PendingChangelog {
+    readonly version?: number;
+}
 
 interface GitHubCommitItem {
     readonly sha?: string;
@@ -112,6 +117,11 @@ const commitIsReadmeOnly = async (sha: string): Promise<boolean> => {
     }
 };
 
+const stripTrailingEllipsis = (value: string): string => value.replace(/(?:\.\.\.|…)+$/, "").trim();
+const stripLeadingEllipsis = (value: string): string => value.replace(/^(?:\.\.\.|…)+/, "").trim();
+const hasEllipsisSuffix = (value: string): boolean => /(?:\.\.\.|…)$/.test(value);
+const hasEllipsisPrefix = (value: string): boolean => /^(?:\.\.\.|…)/.test(value);
+
 const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     const rawMessage = item.commit?.message?.trim() ?? "";
     if (!rawMessage) return null;
@@ -120,13 +130,13 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     let title = (lines[0] ?? "").trim();
     const rest = lines.slice(1);
 
-    // GitHub wraps commit titles longer than 72 chars into the first body line prefixed with "..."
-    if (title.endsWith("...") && rest.length > 0) {
+    // GitHub wraps commit titles longer than 72 chars into the first body line prefixed with "..." or "…"
+    if (hasEllipsisSuffix(title) && rest.length > 0) {
         const firstRestIdx = rest.findIndex(line => line.trim().length > 0);
         if (firstRestIdx !== -1) {
             const continuation = rest[firstRestIdx]!.trim();
-            if (continuation.startsWith("...")) {
-                title = `${title.slice(0, -3)}${continuation.slice(3)}`.trim();
+            if (hasEllipsisPrefix(continuation)) {
+                title = `${stripTrailingEllipsis(title)} ${stripLeadingEllipsis(continuation)}`.replace(/\s{2,}/g, " ").trim();
                 rest.splice(firstRestIdx, 1);
             }
         }
@@ -230,12 +240,13 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     const pendingChangelogFile = join(paths.data, ".pending-changelog.json");
     const cachedChangelogFile = join(paths.data, "changelog.json");
 
-    const readChangelogFile = (filePath: string): PendingChangelog | null => {
+    const readChangelogFile = (filePath: string, requireCurrentVersion = false): PendingChangelog | null => {
         if (!existsSync(filePath)) return null;
         try {
             const raw = readFileSync(filePath, "utf8");
-            const parsed = JSON.parse(raw) as PendingChangelog;
-            return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? parsed : null;
+            const parsed = JSON.parse(raw) as CachedChangelogFile;
+            if (requireCurrentVersion && parsed.version !== CHANGELOG_CACHE_VERSION) return null;
+            return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? { commits: parsed.commits } : null;
         } catch {
             return null;
         }
@@ -345,7 +356,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     });
 
     ipcMain.handle(IpcChannel.GetChangelog, async (): Promise<PendingChangelog | null> => {
-        const cached = readChangelogFile(cachedChangelogFile);
+        const cached = readChangelogFile(cachedChangelogFile, true);
         if (cached) return cached;
 
         const latestSha = await fetchLatestMainSha();
@@ -353,9 +364,9 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         if (commits.length === 0) return null;
 
         mkdirSync(paths.data, { recursive: true });
-        const payload: PendingChangelog = { commits };
+        const payload: CachedChangelogFile = { version: CHANGELOG_CACHE_VERSION, commits };
         writeFileSync(cachedChangelogFile, JSON.stringify(payload), "utf8");
-        return payload;
+        return { commits };
     });
 
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));
@@ -373,7 +384,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         const commits = await fetchAllCommitsUpTo(latestSha);
         if (commits.length > 0) {
             mkdirSync(paths.data, { recursive: true });
-            const serialized = JSON.stringify({ commits } satisfies PendingChangelog);
+            const serialized = JSON.stringify({ version: CHANGELOG_CACHE_VERSION, commits } satisfies CachedChangelogFile);
             writeFileSync(pendingChangelogFile, serialized, "utf8");
             writeFileSync(cachedChangelogFile, serialized, "utf8");
         }
