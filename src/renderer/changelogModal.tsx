@@ -26,8 +26,8 @@ const renderFeaturedEntry = (commit: ChangelogCommit): string => {
                 <span class="inline-flex items-center rounded-md bg-brand-primary-500/20 px-2 py-0.5 text-xs font-semibold text-brand-primary-400">Latest</span>
                 ${dateStr ? `<span class="text-xs text-foreground-500">${escapeHtml(dateStr)}</span>` : ""}
             </div>
-            <span class="text-lg font-bold leading-snug text-foreground-0">${escapeHtml(commit.title)}</span>
-            ${commit.body ? `<span class="whitespace-pre-line text-sm leading-relaxed text-foreground-300">${escapeHtml(commit.body)}</span>` : ""}
+            <span class="whitespace-normal break-words text-lg font-bold leading-snug text-foreground-0">${escapeHtml(commit.title)}</span>
+            ${commit.body ? `<span class="whitespace-pre-line break-words text-sm leading-relaxed text-foreground-300">${escapeHtml(commit.body)}</span>` : ""}
         </div>
     `;
 };
@@ -37,10 +37,10 @@ const renderPastEntry = (commit: ChangelogCommit): string => {
     return `
         <div class="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
             <div class="flex items-start justify-between gap-3">
-                <span class="text-sm font-medium text-foreground-0">${escapeHtml(commit.title)}</span>
+                <span class="min-w-0 whitespace-normal break-words text-sm font-medium text-foreground-0">${escapeHtml(commit.title)}</span>
                 ${dateStr ? `<span class="shrink-0 text-xs text-foreground-500">${escapeHtml(dateStr)}</span>` : ""}
             </div>
-            ${commit.body ? `<span class="whitespace-pre-line text-xs leading-relaxed text-foreground-300">${escapeHtml(commit.body)}</span>` : ""}
+            ${commit.body ? `<span class="whitespace-pre-line break-words text-xs leading-relaxed text-foreground-300">${escapeHtml(commit.body)}</span>` : ""}
         </div>
     `;
 };

@@ -117,8 +117,22 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     if (!rawMessage) return null;
 
     const lines = rawMessage.split(/\r?\n/);
-    const title = (lines[0] ?? "").trim();
-    const body = lines.slice(1).join("\n").trim();
+    let title = (lines[0] ?? "").trim();
+    const rest = lines.slice(1);
+
+    // GitHub wraps commit titles longer than 72 chars into the first body line prefixed with "..."
+    if (title.endsWith("...") && rest.length > 0) {
+        const firstRestIdx = rest.findIndex(line => line.trim().length > 0);
+        if (firstRestIdx !== -1) {
+            const continuation = rest[firstRestIdx]!.trim();
+            if (continuation.startsWith("...")) {
+                title = `${title.slice(0, -3)}${continuation.slice(3)}`.trim();
+                rest.splice(firstRestIdx, 1);
+            }
+        }
+    }
+
+    const body = rest.join("\n").trim();
     const date = item.commit?.author?.date ?? "";
 
     return { title, body, date };
