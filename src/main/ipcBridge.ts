@@ -52,6 +52,11 @@ const isIgnoredDocsFile = (filename: string): boolean => {
     return normalized === "readme.md" || normalized.endsWith("/readme.md");
 };
 
+const isReadmeOnlyTitle = (title: string): boolean => {
+    const normalized = title.trim().toLowerCase();
+    return /^(update|edit|fix|docs?|chore)?\s*(\(.+\))?:?\s*readme(\.md)?$/i.test(normalized);
+};
+
 const hasCodeChangesBetween = async (fromSha: string, toSha: string): Promise<boolean> => {
     const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
     try {
@@ -65,17 +70,17 @@ const hasCodeChangesBetween = async (fromSha: string, toSha: string): Promise<bo
     }
 };
 
-const commitHasCodeChanges = async (sha: string): Promise<boolean> => {
-    if (!sha) return true;
+const commitIsReadmeOnly = async (sha: string): Promise<boolean> => {
+    if (!sha) return false;
     const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
     try {
         const res = await net.fetch(`${GITHUB_REPO_API}/commits/${sha}`, { headers });
-        if (!res.ok) return true;
+        if (!res.ok) return false;
         const data = (await res.json()) as { files?: ReadonlyArray<{ readonly filename?: string }> };
         if (!Array.isArray(data.files) || data.files.length === 0) return false;
-        return data.files.some(file => typeof file.filename === "string" && !isIgnoredDocsFile(file.filename));
+        return data.files.every(file => typeof file.filename === "string" && isIgnoredDocsFile(file.filename));
     } catch {
-        return true;
+        return false;
     }
 };
 
@@ -93,39 +98,51 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
 
 const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCommit[]> => {
     const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
-    const rawItems: GitHubCommitItem[] = [];
 
-    for (let page = 1; page <= 10; page++) {
-        try {
-            const res = await net.fetch(`${GITHUB_REPO_API}/commits?sha=${toSha}&per_page=100&page=${page}`, { headers });
-            if (!res.ok) break;
-            const listData = (await res.json()) as readonly GitHubCommitItem[];
-            if (!Array.isArray(listData) || listData.length === 0) break;
+    // 1. Fetch all commits and README-touching commits in just 2 requests total
+    const [allRes, readmeRes] = await Promise.all([
+        net.fetch(`${GITHUB_REPO_API}/commits?sha=${toSha}&per_page=100`, { headers }).catch(() => null),
+        net.fetch(`${GITHUB_REPO_API}/commits?path=README.md&sha=${toSha}&per_page=100`, { headers }).catch(() => null)
+    ]);
 
-            rawItems.push(...listData);
-            if (listData.length < 100) break;
-        } catch {
-            break;
+    if (!allRes || !allRes.ok) return [];
+    const rawItems = (await allRes.json()) as readonly GitHubCommitItem[];
+    if (!Array.isArray(rawItems) || rawItems.length === 0) return [];
+
+    const readmeTouchingShas = new Set<string>();
+    if (readmeRes && readmeRes.ok) {
+        const readmeItems = (await readmeRes.json()) as readonly GitHubCommitItem[];
+        if (Array.isArray(readmeItems)) {
+            for (const item of readmeItems) {
+                if (item.sha) readmeTouchingShas.add(item.sha.trim());
+            }
         }
     }
 
-    const filtered: ChangelogCommit[] = [];
-    const batchSize = 8;
-
-    for (let i = 0; i < rawItems.length; i += batchSize) {
-        const batch = rawItems.slice(i, i + batchSize);
-        const results = await Promise.all(
-            batch.map(async item => {
-                const parsed = parseGitHubCommit(item);
-                if (!parsed) return null;
-                const sha = item.sha?.trim() ?? "";
-                const include = await commitHasCodeChanges(sha);
-                return include ? parsed : null;
+    // 2. Only inspect the few commits that actually touched README.md to see if they touched anything else
+    const readmeOnlyShas = new Set<string>();
+    const shasToInspect = [...readmeTouchingShas];
+    for (let i = 0; i < shasToInspect.length; i += 6) {
+        const batch = shasToInspect.slice(i, i + 6);
+        await Promise.all(
+            batch.map(async sha => {
+                if (await commitIsReadmeOnly(sha)) {
+                    readmeOnlyShas.add(sha);
+                }
             })
         );
-        for (const entry of results) {
-            if (entry) filtered.push(entry);
-        }
+    }
+
+    const filtered: ChangelogCommit[] = [];
+    for (const item of rawItems) {
+        const sha = item.sha?.trim() ?? "";
+        if (sha && readmeOnlyShas.has(sha)) continue;
+
+        const parsed = parseGitHubCommit(item);
+        if (!parsed) continue;
+        if (isReadmeOnlyTitle(parsed.title)) continue;
+
+        filtered.push(parsed);
     }
 
     return filtered;

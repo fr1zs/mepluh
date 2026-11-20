@@ -43,7 +43,7 @@ irm https://raw.githubusercontent.com/fr1zs/mepluh/main/install.ps1 | iex
 
 Open Medal's settings and look for the **Mepluh** section.
 
-*When Medal updates, Mepluh gets uninjected. So when it does, open Powershell and run:
+**When Medal updates, Mepluh gets uninjected. So when it does, open Powershell and run:**
 ```sh
 cd mepluh
 bun run inject
