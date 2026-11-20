@@ -26,6 +26,7 @@ const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zi
 const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 interface GitHubCommitItem {
+    readonly sha?: string;
     readonly commit?: {
         readonly message?: string;
         readonly author?: {
@@ -64,6 +65,20 @@ const hasCodeChangesBetween = async (fromSha: string, toSha: string): Promise<bo
     }
 };
 
+const commitHasCodeChanges = async (sha: string): Promise<boolean> => {
+    if (!sha) return true;
+    const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
+    try {
+        const res = await net.fetch(`${GITHUB_REPO_API}/commits/${sha}`, { headers });
+        if (!res.ok) return true;
+        const data = (await res.json()) as { files?: ReadonlyArray<{ readonly filename?: string }> };
+        if (!Array.isArray(data.files) || data.files.length === 0) return false;
+        return data.files.some(file => typeof file.filename === "string" && !isIgnoredDocsFile(file.filename));
+    } catch {
+        return true;
+    }
+};
+
 const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     const rawMessage = item.commit?.message?.trim() ?? "";
     if (!rawMessage) return null;
@@ -78,7 +93,7 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
 
 const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCommit[]> => {
     const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
-    const all: ChangelogCommit[] = [];
+    const rawItems: GitHubCommitItem[] = [];
 
     for (let page = 1; page <= 10; page++) {
         try {
@@ -87,18 +102,33 @@ const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCom
             const listData = (await res.json()) as readonly GitHubCommitItem[];
             if (!Array.isArray(listData) || listData.length === 0) break;
 
-            for (const item of listData) {
-                const parsed = parseGitHubCommit(item);
-                if (parsed) all.push(parsed);
-            }
-
+            rawItems.push(...listData);
             if (listData.length < 100) break;
         } catch {
             break;
         }
     }
 
-    return all;
+    const filtered: ChangelogCommit[] = [];
+    const batchSize = 8;
+
+    for (let i = 0; i < rawItems.length; i += batchSize) {
+        const batch = rawItems.slice(i, i + batchSize);
+        const results = await Promise.all(
+            batch.map(async item => {
+                const parsed = parseGitHubCommit(item);
+                if (!parsed) return null;
+                const sha = item.sha?.trim() ?? "";
+                const include = await commitHasCodeChanges(sha);
+                return include ? parsed : null;
+            })
+        );
+        for (const entry of results) {
+            if (entry) filtered.push(entry);
+        }
+    }
+
+    return filtered;
 };
 
 export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: IpcServices): void => {
