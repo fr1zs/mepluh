@@ -4,10 +4,14 @@ const MIN_ZOOM = 1;
 const MAX_ZOOM = 6;
 const WHEEL_STEP = 0.25;
 const DRAG_THRESHOLD_PX = 5;
+const ZOOM_BADGE_VISIBLE_MS = 1400;
+const MOUSE_IDLE_MS = 1500;
 const STYLE_ID = "mepluh-screenshot-zoom-style";
 const FULLSCREEN_BTN_ATTR = "data-mepluh-screenshot-fs-btn";
 const ZOOM_BADGE_ATTR = "data-mepluh-screenshot-zoom-badge";
 const WINDOW_FS_ATTR = "data-mepluh-window-fs";
+const IDLE_HIDDEN_ATTR = "data-mepluh-idle-hidden";
+const ZOOM_VISIBLE_ATTR = "data-mepluh-zoom-visible";
 
 let clickHandler: ((event: MouseEvent) => void) | undefined;
 let pointerDownHandler: ((event: PointerEvent) => void) | undefined;
@@ -16,9 +20,13 @@ let wheelHandler: ((event: WheelEvent) => void) | undefined;
 let mouseDownHandler: ((event: MouseEvent) => void) | undefined;
 let mouseMoveHandler: ((event: MouseEvent) => void) | undefined;
 let mouseUpHandler: ((event: MouseEvent) => void) | undefined;
+let mouseLeaveHandler: ((event: MouseEvent) => void) | undefined;
+let windowBlurHandler: (() => void) | undefined;
 let keyDownHandler: ((event: KeyboardEvent) => void) | undefined;
 let domObserver: MutationObserver | undefined;
 let copyFeedbackTimer: number | undefined;
+let zoomBadgeTimer: number | undefined;
+let mouseIdleTimer: number | undefined;
 let isSyncing = false;
 
 let activeImg: HTMLImageElement | null = null;
@@ -29,6 +37,8 @@ let isDragging = false;
 let hasDragged = false;
 let startX = 0;
 let startY = 0;
+let isMouseIdle = false;
+let isZoomBadgeVisible = false;
 
 interface ScreenshotTarget {
     container: HTMLElement;
@@ -69,8 +79,8 @@ const injectStyle = (): void => {
             justify-content: center;
             cursor: pointer;
             opacity: 0;
-            transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
-            pointer-events: auto !important;
+            transition: opacity 0.18s ease, background-color 0.15s ease, transform 0.12s ease;
+            pointer-events: none;
         }
         [${ZOOM_BADGE_ATTR}="true"] {
             position: absolute;
@@ -94,7 +104,11 @@ const injectStyle = (): void => {
             user-select: none;
             cursor: default;
             opacity: 0;
-            transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+            transition: opacity 0.18s ease, background-color 0.15s ease, transform 0.12s ease;
+            pointer-events: none;
+        }
+        [${ZOOM_BADGE_ATTR}="true"][${ZOOM_VISIBLE_ATTR}="true"] {
+            opacity: 1;
             pointer-events: auto !important;
         }
         [${ZOOM_BADGE_ATTR}="true"][data-zoomed="true"] {
@@ -104,12 +118,19 @@ const injectStyle = (): void => {
             background: rgba(32, 32, 38, 0.9);
             transform: scale(1.04);
         }
-        [class*="group/screenshot"]:hover [${FULLSCREEN_BTN_ATTR}="true"],
-        [class*="group/screenshot"]:hover [${ZOOM_BADGE_ATTR}="true"],
-        [${FULLSCREEN_BTN_ATTR}="true"]:focus-visible,
-        [${WINDOW_FS_ATTR}="true"] [${FULLSCREEN_BTN_ATTR}="true"],
-        [${WINDOW_FS_ATTR}="true"] [${ZOOM_BADGE_ATTR}="true"] {
+        [class*="group/screenshot"]:hover:not([${IDLE_HIDDEN_ATTR}="true"]) [${FULLSCREEN_BTN_ATTR}="true"],
+        [${WINDOW_FS_ATTR}="true"]:not([${IDLE_HIDDEN_ATTR}="true"]) [${FULLSCREEN_BTN_ATTR}="true"] {
             opacity: 1;
+            pointer-events: auto !important;
+        }
+        [class*="group/screenshot"][${IDLE_HIDDEN_ATTR}="true"],
+        [class*="group/screenshot"][${IDLE_HIDDEN_ATTR}="true"] * {
+            cursor: none !important;
+        }
+        [class*="group/screenshot"][${IDLE_HIDDEN_ATTR}="true"] [${FULLSCREEN_BTN_ATTR}="true"],
+        [class*="group/screenshot"][${IDLE_HIDDEN_ATTR}="true"] [${ZOOM_BADGE_ATTR}="true"] {
+            opacity: 0 !important;
+            pointer-events: none !important;
         }
         [${FULLSCREEN_BTN_ATTR}="true"]:hover {
             background: rgba(32, 32, 38, 0.9);
@@ -168,7 +189,81 @@ const getScreenshotTarget = (target: EventTarget | null): ScreenshotTarget | nul
     return { container, img };
 };
 
-const updateZoomBadge = (container?: HTMLElement | null): void => {
+const syncIdleStateOnDom = (container?: HTMLElement | null): void => {
+    const target = container ?? getActiveScreenshot()?.container;
+    if (!target) return;
+    if (isMouseIdle) {
+        if (target.getAttribute(IDLE_HIDDEN_ATTR) !== "true") {
+            target.setAttribute(IDLE_HIDDEN_ATTR, "true");
+        }
+    } else if (target.hasAttribute(IDLE_HIDDEN_ATTR)) {
+        target.removeAttribute(IDLE_HIDDEN_ATTR);
+    }
+};
+
+const setMouseIdle = (idle: boolean, container?: HTMLElement | null): void => {
+    isMouseIdle = idle;
+    if (idle) {
+        isZoomBadgeVisible = false;
+        if (zoomBadgeTimer !== undefined) {
+            window.clearTimeout(zoomBadgeTimer);
+            zoomBadgeTimer = undefined;
+        }
+        const target = container ?? getActiveScreenshot()?.container;
+        const badge = target?.querySelector<HTMLElement>(`[${ZOOM_BADGE_ATTR}="true"]`);
+        badge?.removeAttribute(ZOOM_VISIBLE_ATTR);
+    }
+    syncIdleStateOnDom(container);
+};
+
+const bumpMouseActivity = (container?: HTMLElement | null): void => {
+    if (mouseIdleTimer !== undefined) {
+        window.clearTimeout(mouseIdleTimer);
+        mouseIdleTimer = undefined;
+    }
+    if (isMouseIdle) {
+        setMouseIdle(false, container);
+    }
+    mouseIdleTimer = window.setTimeout(() => {
+        mouseIdleTimer = undefined;
+        if (!isDragging) {
+            setMouseIdle(true, container);
+        }
+    }, MOUSE_IDLE_MS);
+};
+
+const flashZoomBadge = (container?: HTMLElement | null): void => {
+    const targetContainer =
+        container ??
+        activeImg?.closest<HTMLElement>('[class*="group/screenshot"]') ??
+        getActiveScreenshot()?.container;
+    if (!targetContainer) return;
+
+    if (isMouseIdle) {
+        setMouseIdle(false, targetContainer);
+    }
+    bumpMouseActivity(targetContainer);
+
+    isZoomBadgeVisible = true;
+    const badge = targetContainer.querySelector<HTMLElement>(`[${ZOOM_BADGE_ATTR}="true"]`);
+    if (badge) {
+        badge.setAttribute(ZOOM_VISIBLE_ATTR, "true");
+    }
+
+    if (zoomBadgeTimer !== undefined) {
+        window.clearTimeout(zoomBadgeTimer);
+    }
+    zoomBadgeTimer = window.setTimeout(() => {
+        zoomBadgeTimer = undefined;
+        isZoomBadgeVisible = false;
+        const currentBadge = (
+            targetContainer.isConnected ? targetContainer : getActiveScreenshot()?.container
+        )?.querySelector<HTMLElement>(`[${ZOOM_BADGE_ATTR}="true"]`);
+        currentBadge?.removeAttribute(ZOOM_VISIBLE_ATTR);
+    }, ZOOM_BADGE_VISIBLE_MS);
+};
+
+const updateZoomBadge = (container?: HTMLElement | null, announceChange = false): void => {
     const targetContainer =
         container ??
         activeImg?.closest<HTMLElement>('[class*="group/screenshot"]') ??
@@ -180,10 +275,19 @@ const updateZoomBadge = (container?: HTMLElement | null): void => {
 
     const pct = `${Math.round(scale * 100)}%`;
     const isZoomed = scale > 1.01 ? "true" : "false";
-    if (badge.textContent !== pct) badge.textContent = pct;
+    const changed = badge.textContent !== pct;
+    if (changed) badge.textContent = pct;
     if (badge.dataset.zoomed !== isZoomed) {
         badge.dataset.zoomed = isZoomed;
         badge.title = isZoomed === "true" ? "Reset zoom (100%)" : "Zoom level";
+    }
+
+    if (announceChange && changed) {
+        flashZoomBadge(targetContainer);
+    } else if (isZoomBadgeVisible && !isMouseIdle) {
+        badge.setAttribute(ZOOM_VISIBLE_ATTR, "true");
+    } else {
+        badge.removeAttribute(ZOOM_VISIBLE_ATTR);
     }
 };
 
@@ -206,7 +310,7 @@ const clampTranslation = (
     };
 };
 
-const applyTransform = (img: HTMLImageElement, smooth: boolean): void => {
+const applyTransform = (img: HTMLImageElement, smooth: boolean, announceZoom = false): void => {
     img.style.willChange = scale > 1 ? "transform" : "auto";
     img.style.transition = smooth ? "transform 0.16s cubic-bezier(0.2, 0, 0, 1)" : "none";
     img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
@@ -215,24 +319,26 @@ const applyTransform = (img: HTMLImageElement, smooth: boolean): void => {
     const cursor = scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in";
     img.style.cursor = cursor;
     if (container) container.style.cursor = cursor;
-    updateZoomBadge(container);
+    updateZoomBadge(container, announceZoom);
 };
 
-const resetZoom = (smooth = true): void => {
+const resetZoom = (smooth = true, announceZoom = true): void => {
     if (!activeImg) {
+        const hadZoom = scale !== 1;
         scale = 1;
         translateX = 0;
         translateY = 0;
-        updateZoomBadge();
+        updateZoomBadge(undefined, announceZoom && hadZoom);
         return;
     }
     const img = activeImg;
+    const hadZoom = scale !== 1;
     scale = 1;
     translateX = 0;
     translateY = 0;
     isDragging = false;
     hasDragged = false;
-    applyTransform(img, smooth);
+    applyTransform(img, smooth, announceZoom && hadZoom);
     activeImg = null;
 };
 
@@ -265,13 +371,14 @@ const ensureOverlayControls = (container: HTMLElement): void => {
         badge.setAttribute(ZOOM_BADGE_ATTR, "true");
         container.appendChild(badge);
     }
-    updateZoomBadge(container);
+    updateZoomBadge(container, false);
+    syncIdleStateOnDom(container);
 };
 
 const setWindowFullscreen = (container: HTMLElement, enabled: boolean): void => {
     isSyncing = true;
     try {
-        resetZoom(false);
+        resetZoom(false, false);
         if (enabled) {
             container.setAttribute(WINDOW_FS_ATTR, "true");
         } else {
@@ -279,7 +386,8 @@ const setWindowFullscreen = (container: HTMLElement, enabled: boolean): void => 
         }
         const btn = container.querySelector<HTMLButtonElement>(`button[${FULLSCREEN_BTN_ATTR}="true"]`);
         if (btn) updateFullscreenButtonState(btn, container);
-        updateZoomBadge(container);
+        updateZoomBadge(container, false);
+        bumpMouseActivity(container);
     } finally {
         isSyncing = false;
     }
@@ -298,12 +406,12 @@ const zoomAtPoint = (
     smooth: boolean
 ): void => {
     if (activeImg && activeImg !== img) {
-        resetZoom(false);
+        resetZoom(false, false);
     }
 
     const clampedScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetScale));
     if (clampedScale <= 1.01) {
-        resetZoom(smooth);
+        resetZoom(smooth, true);
         return;
     }
 
@@ -323,7 +431,7 @@ const zoomAtPoint = (
     scale = clampedScale;
     activeImg = img;
 
-    applyTransform(img, smooth);
+    applyTransform(img, smooth, true);
 };
 
 const copyScreenshotToClipboard = async (img: HTMLImageElement): Promise<boolean> => {
@@ -444,7 +552,7 @@ export default definePlugin({
                 if (zoomBadge) {
                     event.preventDefault();
                     event.stopImmediatePropagation();
-                    if (scale > 1) resetZoom(true);
+                    if (scale > 1) resetZoom(true, true);
                     return;
                 }
 
@@ -484,6 +592,7 @@ export default definePlugin({
 
             event.preventDefault();
             event.stopImmediatePropagation();
+            bumpMouseActivity(found.container);
 
             if (hasDragged) {
                 hasDragged = false;
@@ -491,7 +600,7 @@ export default definePlugin({
             }
 
             if (scale > 1) {
-                resetZoom(true);
+                resetZoom(true, true);
             } else {
                 zoomAtPoint(found.img, clickZoomLevel, event.clientX, event.clientY, true);
             }
@@ -546,6 +655,7 @@ export default definePlugin({
             if (!found) return;
 
             event.preventDefault();
+            bumpMouseActivity(found.container);
             if (scale <= 1) return;
 
             event.stopImmediatePropagation();
@@ -553,10 +663,25 @@ export default definePlugin({
             hasDragged = false;
             startX = event.clientX - translateX;
             startY = event.clientY - translateY;
-            applyTransform(found.img, false);
+            applyTransform(found.img, false, false);
         };
 
         mouseMoveHandler = (event: MouseEvent): void => {
+            const active = getActiveScreenshot();
+            if (active) {
+                const insideContainer =
+                    event.target instanceof Element && active.container.contains(event.target);
+                if (insideContainer || isDragging) {
+                    bumpMouseActivity(active.container);
+                } else if (!isMouseIdle) {
+                    if (mouseIdleTimer !== undefined) {
+                        window.clearTimeout(mouseIdleTimer);
+                        mouseIdleTimer = undefined;
+                    }
+                    setMouseIdle(true, active.container);
+                }
+            }
+
             if (!isDragging || !activeImg) return;
 
             const rawX = event.clientX - startX;
@@ -569,13 +694,33 @@ export default definePlugin({
             const clamped = clampTranslation(activeImg, scale, rawX, rawY);
             translateX = clamped.x;
             translateY = clamped.y;
-            applyTransform(activeImg, false);
+            applyTransform(activeImg, false, false);
         };
 
         mouseUpHandler = (): void => {
             if (!isDragging) return;
             isDragging = false;
-            if (activeImg) applyTransform(activeImg, false);
+            if (activeImg) {
+                applyTransform(activeImg, false, false);
+                bumpMouseActivity(activeImg.closest<HTMLElement>('[class*="group/screenshot"]'));
+            }
+        };
+
+        mouseLeaveHandler = (event: MouseEvent): void => {
+            if (event.relatedTarget !== null) return;
+            if (mouseIdleTimer !== undefined) {
+                window.clearTimeout(mouseIdleTimer);
+                mouseIdleTimer = undefined;
+            }
+            setMouseIdle(true);
+        };
+
+        windowBlurHandler = (): void => {
+            if (mouseIdleTimer !== undefined) {
+                window.clearTimeout(mouseIdleTimer);
+                mouseIdleTimer = undefined;
+            }
+            setMouseIdle(true);
         };
 
         keyDownHandler = (event: KeyboardEvent): void => {
@@ -584,7 +729,7 @@ export default definePlugin({
             if (scale > 1) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
-                resetZoom(true);
+                resetZoom(true, true);
                 return;
             }
 
@@ -603,6 +748,8 @@ export default definePlugin({
         window.addEventListener("mousedown", mouseDownHandler, true);
         window.addEventListener("mousemove", mouseMoveHandler, true);
         window.addEventListener("mouseup", mouseUpHandler, true);
+        document.addEventListener("mouseleave", mouseLeaveHandler, true);
+        window.addEventListener("blur", windowBlurHandler, true);
         window.addEventListener("keydown", keyDownHandler, true);
 
         domObserver = new MutationObserver(() => syncScreenshotUI());
@@ -617,9 +764,20 @@ export default definePlugin({
             window.clearTimeout(copyFeedbackTimer);
             copyFeedbackTimer = undefined;
         }
+        if (zoomBadgeTimer !== undefined) {
+            window.clearTimeout(zoomBadgeTimer);
+            zoomBadgeTimer = undefined;
+        }
+        if (mouseIdleTimer !== undefined) {
+            window.clearTimeout(mouseIdleTimer);
+            mouseIdleTimer = undefined;
+        }
 
         document.querySelectorAll<HTMLElement>(`[${WINDOW_FS_ATTR}="true"]`).forEach(el => {
             el.removeAttribute(WINDOW_FS_ATTR);
+        });
+        document.querySelectorAll<HTMLElement>(`[${IDLE_HIDDEN_ATTR}="true"]`).forEach(el => {
+            el.removeAttribute(IDLE_HIDDEN_ATTR);
         });
         document.querySelectorAll(`button[${FULLSCREEN_BTN_ATTR}="true"]`).forEach(btn => btn.remove());
         document.querySelectorAll(`div[${ZOOM_BADGE_ATTR}="true"]`).forEach(badge => badge.remove());
@@ -629,7 +787,7 @@ export default definePlugin({
             .querySelectorAll<HTMLButtonElement>('button[data-mepluh-copy-btn="true"]')
             .forEach(restoreStoryButton);
 
-        resetZoom(false);
+        resetZoom(false, false);
 
         if (clickHandler) window.removeEventListener("click", clickHandler, true);
         if (pointerDownHandler) window.removeEventListener("pointerdown", pointerDownHandler, true);
@@ -638,6 +796,8 @@ export default definePlugin({
         if (mouseDownHandler) window.removeEventListener("mousedown", mouseDownHandler, true);
         if (mouseMoveHandler) window.removeEventListener("mousemove", mouseMoveHandler, true);
         if (mouseUpHandler) window.removeEventListener("mouseup", mouseUpHandler, true);
+        if (mouseLeaveHandler) document.removeEventListener("mouseleave", mouseLeaveHandler, true);
+        if (windowBlurHandler) window.removeEventListener("blur", windowBlurHandler, true);
         if (keyDownHandler) window.removeEventListener("keydown", keyDownHandler, true);
 
         clickHandler = undefined;
@@ -647,6 +807,8 @@ export default definePlugin({
         mouseDownHandler = undefined;
         mouseMoveHandler = undefined;
         mouseUpHandler = undefined;
+        mouseLeaveHandler = undefined;
+        windowBlurHandler = undefined;
         keyDownHandler = undefined;
     }
 });
