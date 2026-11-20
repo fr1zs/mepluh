@@ -179,19 +179,21 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         event.returnValue = readUpdateAvailable();
     });
 
-    ipcMain.handle(IpcChannel.ConsumeChangelog, (): PendingChangelog | null => {
+    ipcMain.handle(IpcChannel.GetPendingChangelog, (): PendingChangelog | null => {
         if (!existsSync(pendingChangelogFile)) return null;
         try {
             const raw = readFileSync(pendingChangelogFile, "utf8");
-            unlinkSync(pendingChangelogFile);
             const parsed = JSON.parse(raw) as PendingChangelog;
             return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? parsed : null;
         } catch {
-            try {
-                unlinkSync(pendingChangelogFile);
-            } catch {}
             return null;
         }
+    });
+
+    ipcMain.handle(IpcChannel.DismissPendingChangelog, (): void => {
+        try {
+            if (existsSync(pendingChangelogFile)) unlinkSync(pendingChangelogFile);
+        } catch {}
     });
 
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));

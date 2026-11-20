@@ -11,7 +11,8 @@ export const IpcChannel = {
     UpdateMepluh: "mepluh:update-mepluh",
     UpdateAvailableGet: "mepluh:update-available:get",
     UpdateAvailableChanged: "mepluh:update-available:changed",
-    ConsumeChangelog: "mepluh:changelog:consume",
+    GetPendingChangelog: "mepluh:changelog:get",
+    DismissPendingChangelog: "mepluh:changelog:dismiss",
     OpenPath: "mepluh:open-path",
     PatchReport: "mepluh:patch-report",
     MonacoAssets: "mepluh:monaco-assets",
@@ -69,7 +70,8 @@ export interface MepluhNative {
     updateMepluh(install?: boolean): Promise<UpdateResult>;
     isUpdateAvailable(): boolean;
     onUpdateAvailableChanged(listener: (available: boolean) => void): () => void;
-    consumeChangelog(): Promise<PendingChangelog | null>;
+    getPendingChangelog(): Promise<PendingChangelog | null>;
+    dismissPendingChangelog(): Promise<void>;
     openPath(location: ModLocation): Promise<void>;
     patchReport(): Promise<PatchReport>;
     loadMonaco(): Promise<MonacoStyles>;

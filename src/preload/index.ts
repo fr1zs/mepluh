@@ -43,7 +43,8 @@ const native: MepluhNative = {
         ipcRenderer.on(IpcChannel.UpdateAvailableChanged, forward);
         return () => ipcRenderer.off(IpcChannel.UpdateAvailableChanged, forward);
     },
-    consumeChangelog: () => ipcRenderer.invoke(IpcChannel.ConsumeChangelog) as Promise<PendingChangelog | null>,
+    getPendingChangelog: () => ipcRenderer.invoke(IpcChannel.GetPendingChangelog) as Promise<PendingChangelog | null>,
+    dismissPendingChangelog: () => ipcRenderer.invoke(IpcChannel.DismissPendingChangelog) as Promise<void>,
     openPath: location => ipcRenderer.invoke(IpcChannel.OpenPath, location) as Promise<void>,
     patchReport: () => ipcRenderer.invoke(IpcChannel.PatchReport) as Promise<PatchReport>,
     loadMonaco,
