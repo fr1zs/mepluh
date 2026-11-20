@@ -5,6 +5,9 @@ const MAX_ZOOM = 6;
 const WHEEL_STEP = 0.25;
 const DRAG_THRESHOLD_PX = 5;
 const STYLE_ID = "mepluh-screenshot-zoom-style";
+const FULLSCREEN_BTN_ATTR = "data-mepluh-screenshot-fs-btn";
+const ZOOM_BADGE_ATTR = "data-mepluh-screenshot-zoom-badge";
+const WINDOW_FS_ATTR = "data-mepluh-window-fs";
 
 let clickHandler: ((event: MouseEvent) => void) | undefined;
 let pointerDownHandler: ((event: PointerEvent) => void) | undefined;
@@ -16,6 +19,7 @@ let mouseUpHandler: ((event: MouseEvent) => void) | undefined;
 let keyDownHandler: ((event: KeyboardEvent) => void) | undefined;
 let domObserver: MutationObserver | undefined;
 let copyFeedbackTimer: number | undefined;
+let isSyncing = false;
 
 let activeImg: HTMLImageElement | null = null;
 let scale = 1;
@@ -31,6 +35,9 @@ interface ScreenshotTarget {
     img: HTMLImageElement;
 }
 
+const EXPAND_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+const COMPRESS_SVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>`;
+
 const injectStyle = (): void => {
     const root = document.head ?? document.documentElement;
     if (!root || document.getElementById(STYLE_ID)) return;
@@ -38,12 +45,100 @@ const injectStyle = (): void => {
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-        [class*="group/screenshot"] > div,
-        [class*="group-hover/screenshot"] {
+        [class*="group/screenshot"] > div:not([${FULLSCREEN_BTN_ATTR}]):not([${ZOOM_BADGE_ATTR}]),
+        [class*="group-hover/screenshot"]:not([${FULLSCREEN_BTN_ATTR}]):not([${ZOOM_BADGE_ATTR}]) {
             display: none !important;
             visibility: hidden !important;
             opacity: 0 !important;
             pointer-events: none !important;
+        }
+        [${FULLSCREEN_BTN_ATTR}="true"] {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 30;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(15, 15, 18, 0.72);
+            backdrop-filter: blur(8px);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+            pointer-events: auto !important;
+        }
+        [${ZOOM_BADGE_ATTR}="true"] {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 30;
+            height: 28px;
+            padding: 0 9px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            background: rgba(15, 15, 18, 0.72);
+            backdrop-filter: blur(8px);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.02em;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            cursor: default;
+            opacity: 0;
+            transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+            pointer-events: auto !important;
+        }
+        [${ZOOM_BADGE_ATTR}="true"][data-zoomed="true"] {
+            cursor: pointer;
+        }
+        [${ZOOM_BADGE_ATTR}="true"][data-zoomed="true"]:hover {
+            background: rgba(32, 32, 38, 0.9);
+            transform: scale(1.04);
+        }
+        [class*="group/screenshot"]:hover [${FULLSCREEN_BTN_ATTR}="true"],
+        [class*="group/screenshot"]:hover [${ZOOM_BADGE_ATTR}="true"],
+        [${FULLSCREEN_BTN_ATTR}="true"]:focus-visible,
+        [${WINDOW_FS_ATTR}="true"] [${FULLSCREEN_BTN_ATTR}="true"],
+        [${WINDOW_FS_ATTR}="true"] [${ZOOM_BADGE_ATTR}="true"] {
+            opacity: 1;
+        }
+        [${FULLSCREEN_BTN_ATTR}="true"]:hover {
+            background: rgba(32, 32, 38, 0.9);
+            transform: scale(1.04);
+        }
+        [${FULLSCREEN_BTN_ATTR}="true"]:active {
+            transform: scale(0.97);
+        }
+        [${WINDOW_FS_ATTR}="true"] {
+            position: fixed !important;
+            inset: 0 !important;
+            z-index: 99999 !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: none !important;
+            max-height: none !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            background: #000000 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        [${WINDOW_FS_ATTR}="true"] img {
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            object-fit: contain !important;
         }
     `;
     root.appendChild(style);
@@ -63,11 +158,33 @@ const getActiveScreenshot = (): ScreenshotTarget | null => {
 
 const getScreenshotTarget = (target: EventTarget | null): ScreenshotTarget | null => {
     if (!(target instanceof Element)) return null;
+    if (target.closest(`[${FULLSCREEN_BTN_ATTR}="true"]`) || target.closest(`[${ZOOM_BADGE_ATTR}="true"]`)) {
+        return null;
+    }
     const container = target.closest<HTMLElement>('[class*="group/screenshot"]');
     if (!container) return null;
     const img = container.querySelector<HTMLImageElement>("img[alt='Screenshot'], img");
     if (!img) return null;
     return { container, img };
+};
+
+const updateZoomBadge = (container?: HTMLElement | null): void => {
+    const targetContainer =
+        container ??
+        activeImg?.closest<HTMLElement>('[class*="group/screenshot"]') ??
+        getActiveScreenshot()?.container;
+    if (!targetContainer) return;
+
+    const badge = targetContainer.querySelector<HTMLElement>(`[${ZOOM_BADGE_ATTR}="true"]`);
+    if (!badge) return;
+
+    const pct = `${Math.round(scale * 100)}%`;
+    const isZoomed = scale > 1.01 ? "true" : "false";
+    if (badge.textContent !== pct) badge.textContent = pct;
+    if (badge.dataset.zoomed !== isZoomed) {
+        badge.dataset.zoomed = isZoomed;
+        badge.title = isZoomed === "true" ? "Reset zoom (100%)" : "Zoom level";
+    }
 };
 
 const clampTranslation = (
@@ -98,10 +215,17 @@ const applyTransform = (img: HTMLImageElement, smooth: boolean): void => {
     const cursor = scale > 1 ? (isDragging ? "grabbing" : "grab") : "zoom-in";
     img.style.cursor = cursor;
     if (container) container.style.cursor = cursor;
+    updateZoomBadge(container);
 };
 
 const resetZoom = (smooth = true): void => {
-    if (!activeImg) return;
+    if (!activeImg) {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateZoomBadge();
+        return;
+    }
     const img = activeImg;
     scale = 1;
     translateX = 0;
@@ -110,6 +234,60 @@ const resetZoom = (smooth = true): void => {
     hasDragged = false;
     applyTransform(img, smooth);
     activeImg = null;
+};
+
+const updateFullscreenButtonState = (btn: HTMLButtonElement, container: HTMLElement): void => {
+    const nextState = container.getAttribute(WINDOW_FS_ATTR) === "true" ? "fs" : "normal";
+    if (btn.dataset.fsState === nextState) return;
+    btn.dataset.fsState = nextState;
+    btn.innerHTML = nextState === "fs" ? COMPRESS_SVG : EXPAND_SVG;
+    btn.title = nextState === "fs" ? "Exit window fullscreen" : "Expand to window";
+    btn.setAttribute("aria-label", btn.title);
+};
+
+const ensureOverlayControls = (container: HTMLElement): void => {
+    if (container.style.position !== "relative" && getComputedStyle(container).position === "static") {
+        container.style.position = "relative";
+    }
+
+    let btn = container.querySelector<HTMLButtonElement>(`button[${FULLSCREEN_BTN_ATTR}="true"]`);
+    if (!btn) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.setAttribute(FULLSCREEN_BTN_ATTR, "true");
+        container.appendChild(btn);
+    }
+    updateFullscreenButtonState(btn, container);
+
+    let badge = container.querySelector<HTMLDivElement>(`div[${ZOOM_BADGE_ATTR}="true"]`);
+    if (!badge) {
+        badge = document.createElement("div");
+        badge.setAttribute(ZOOM_BADGE_ATTR, "true");
+        container.appendChild(badge);
+    }
+    updateZoomBadge(container);
+};
+
+const setWindowFullscreen = (container: HTMLElement, enabled: boolean): void => {
+    isSyncing = true;
+    try {
+        resetZoom(false);
+        if (enabled) {
+            container.setAttribute(WINDOW_FS_ATTR, "true");
+        } else {
+            container.removeAttribute(WINDOW_FS_ATTR);
+        }
+        const btn = container.querySelector<HTMLButtonElement>(`button[${FULLSCREEN_BTN_ATTR}="true"]`);
+        if (btn) updateFullscreenButtonState(btn, container);
+        updateZoomBadge(container);
+    } finally {
+        isSyncing = false;
+    }
+};
+
+const toggleWindowFullscreen = (container: HTMLElement): void => {
+    const isCurrentlyFs = container.getAttribute(WINDOW_FS_ATTR) === "true";
+    setWindowFullscreen(container, !isCurrentlyFs);
 };
 
 const zoomAtPoint = (
@@ -205,32 +383,43 @@ const restoreStoryButton = (btn: HTMLButtonElement): void => {
 };
 
 const syncScreenshotUI = (): void => {
-    injectStyle();
-    const active = getActiveScreenshot();
-
-    const buttons = document.querySelectorAll<HTMLButtonElement>('[data-slot="button-group"] > button[data-slot="button"]');
-    for (const btn of buttons) {
-        const isStoryBtn =
-            btn.dataset.mepluhCopyBtn === "true" ||
-            btn.textContent?.includes("Add to Story") ||
-            btn.querySelector('[data-shape="stories"]') !== null;
-
-        if (!isStoryBtn) continue;
+    if (isSyncing) return;
+    isSyncing = true;
+    try {
+        injectStyle();
+        const active = getActiveScreenshot();
 
         if (active) {
-            if (btn.dataset.mepluhCopyBtn !== "true") {
-                btn.dataset.mepluhCopyBtn = "true";
-                setButtonLabel(btn, "Copy", "copy");
-            }
-        } else {
-            restoreStoryButton(btn);
+            ensureOverlayControls(active.container);
         }
+
+        const buttons = document.querySelectorAll<HTMLButtonElement>('[data-slot="button-group"] > button[data-slot="button"]');
+        for (const btn of buttons) {
+            const isStoryBtn =
+                btn.dataset.mepluhCopyBtn === "true" ||
+                btn.textContent?.includes("Add to Story") ||
+                btn.querySelector('[data-shape="stories"]') !== null;
+
+            if (!isStoryBtn) continue;
+
+            if (active) {
+                if (btn.dataset.mepluhCopyBtn !== "true") {
+                    btn.dataset.mepluhCopyBtn = "true";
+                    setButtonLabel(btn, "Copy", "copy");
+                }
+            } else {
+                restoreStoryButton(btn);
+            }
+        }
+    } finally {
+        isSyncing = false;
     }
 };
 
 export default definePlugin({
     name: "ScreenshotZoom",
-    description: "Zoom and pan into screenshots on click/scroll, and replace the duplicate Add to Story button with Copy.",
+    description:
+        "Zoom and pan into screenshots on click/scroll, expand to fill the Medal window, and replace the duplicate Add to Story button with Copy.",
     category: "Experimental",
     enabledByDefault: true,
     options: {
@@ -251,6 +440,23 @@ export default definePlugin({
             if (event.button !== 0) return;
 
             if (event.target instanceof Element) {
+                const zoomBadge = event.target.closest<HTMLElement>(`[${ZOOM_BADGE_ATTR}="true"]`);
+                if (zoomBadge) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    if (scale > 1) resetZoom(true);
+                    return;
+                }
+
+                const fsBtn = event.target.closest<HTMLButtonElement>(`button[${FULLSCREEN_BTN_ATTR}="true"]`);
+                if (fsBtn) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    const container = fsBtn.closest<HTMLElement>('[class*="group/screenshot"]');
+                    if (container) toggleWindowFullscreen(container);
+                    return;
+                }
+
                 const copyBtn = event.target.closest<HTMLButtonElement>('button[data-mepluh-copy-btn="true"]');
                 if (copyBtn) {
                     event.preventDefault();
@@ -297,7 +503,12 @@ export default definePlugin({
                 event.stopImmediatePropagation();
                 return;
             }
-            if (event.target instanceof Element && event.target.closest('button[data-mepluh-copy-btn="true"]')) {
+            if (
+                event.target instanceof Element &&
+                (event.target.closest('button[data-mepluh-copy-btn="true"]') ||
+                    event.target.closest(`button[${FULLSCREEN_BTN_ATTR}="true"]`) ||
+                    event.target.closest(`[${ZOOM_BADGE_ATTR}="true"]`))
+            ) {
                 event.stopImmediatePropagation();
             }
         };
@@ -308,7 +519,12 @@ export default definePlugin({
                 event.stopImmediatePropagation();
                 return;
             }
-            if (event.target instanceof Element && event.target.closest('button[data-mepluh-copy-btn="true"]')) {
+            if (
+                event.target instanceof Element &&
+                (event.target.closest('button[data-mepluh-copy-btn="true"]') ||
+                    event.target.closest(`button[${FULLSCREEN_BTN_ATTR}="true"]`) ||
+                    event.target.closest(`[${ZOOM_BADGE_ATTR}="true"]`))
+            ) {
                 event.stopImmediatePropagation();
             }
         };
@@ -363,10 +579,20 @@ export default definePlugin({
         };
 
         keyDownHandler = (event: KeyboardEvent): void => {
-            if (event.key === "Escape" && scale > 1) {
+            if (event.key !== "Escape") return;
+
+            if (scale > 1) {
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 resetZoom(true);
+                return;
+            }
+
+            const fsContainer = document.querySelector<HTMLElement>(`[${WINDOW_FS_ATTR}="true"]`);
+            if (fsContainer) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                setWindowFullscreen(fsContainer, false);
             }
         };
 
@@ -392,6 +618,11 @@ export default definePlugin({
             copyFeedbackTimer = undefined;
         }
 
+        document.querySelectorAll<HTMLElement>(`[${WINDOW_FS_ATTR}="true"]`).forEach(el => {
+            el.removeAttribute(WINDOW_FS_ATTR);
+        });
+        document.querySelectorAll(`button[${FULLSCREEN_BTN_ATTR}="true"]`).forEach(btn => btn.remove());
+        document.querySelectorAll(`div[${ZOOM_BADGE_ATTR}="true"]`).forEach(badge => badge.remove());
         removeStyle();
 
         document
