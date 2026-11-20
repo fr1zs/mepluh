@@ -26,7 +26,6 @@ const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zi
 const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 interface GitHubCommitItem {
-    readonly sha?: string;
     readonly commit?: {
         readonly message?: string;
         readonly author?: {
@@ -48,7 +47,6 @@ export interface IpcServices {
 }
 
 const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
-    const sha = item.sha?.trim().slice(0, 7) ?? "";
     const rawMessage = item.commit?.message?.trim() ?? "";
     if (!rawMessage) return null;
 
@@ -57,7 +55,7 @@ const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     const body = lines.slice(1).join("\n").trim();
     const date = item.commit?.author?.date ?? "";
 
-    return { sha, title, body, date };
+    return { title, body, date };
 };
 
 const fetchAllCommitsUpTo = async (toSha: string): Promise<readonly ChangelogCommit[]> => {
@@ -208,15 +206,10 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         if (status === "up-to-date") return "up-to-date";
         if (!install) return "available";
 
-        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
         const commits = await fetchAllCommitsUpTo(latestSha);
         if (commits.length > 0) {
             mkdirSync(paths.data, { recursive: true });
-            const payload: PendingChangelog = {
-                fromSha: installedSha.slice(0, 7),
-                toSha: latestSha.slice(0, 7),
-                commits
-            };
+            const payload: PendingChangelog = { commits };
             writeFileSync(pendingChangelogFile, JSON.stringify(payload), "utf8");
         }
 

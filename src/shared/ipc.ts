@@ -27,15 +27,12 @@ export const IpcChannel = {
 export type UpdateResult = "up-to-date" | "available" | "updating";
 
 export interface ChangelogCommit {
-    readonly sha: string;
     readonly title: string;
     readonly body: string;
     readonly date: string;
 }
 
 export interface PendingChangelog {
-    readonly fromSha: string;
-    readonly toSha: string;
     readonly commits: readonly ChangelogCommit[];
 }
 
