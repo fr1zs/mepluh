@@ -214,6 +214,18 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     const availableFile = join(paths.data, ".available-commit");
     const lastCheckFile = join(paths.data, ".last-update-check");
     const pendingChangelogFile = join(paths.data, ".pending-changelog.json");
+    const cachedChangelogFile = join(paths.data, "changelog.json");
+
+    const readChangelogFile = (filePath: string): PendingChangelog | null => {
+        if (!existsSync(filePath)) return null;
+        try {
+            const raw = readFileSync(filePath, "utf8");
+            const parsed = JSON.parse(raw) as PendingChangelog;
+            return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? parsed : null;
+        } catch {
+            return null;
+        }
+    };
 
     const broadcastUpdateAvailable = (available: boolean): void => {
         for (const win of BrowserWindow.getAllWindows()) {
@@ -310,21 +322,26 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         event.returnValue = readUpdateAvailable();
     });
 
-    ipcMain.handle(IpcChannel.GetPendingChangelog, (): PendingChangelog | null => {
-        if (!existsSync(pendingChangelogFile)) return null;
-        try {
-            const raw = readFileSync(pendingChangelogFile, "utf8");
-            const parsed = JSON.parse(raw) as PendingChangelog;
-            return Array.isArray(parsed.commits) && parsed.commits.length > 0 ? parsed : null;
-        } catch {
-            return null;
-        }
-    });
+    ipcMain.handle(IpcChannel.GetPendingChangelog, (): PendingChangelog | null => readChangelogFile(pendingChangelogFile));
 
     ipcMain.handle(IpcChannel.DismissPendingChangelog, (): void => {
         try {
             if (existsSync(pendingChangelogFile)) unlinkSync(pendingChangelogFile);
         } catch {}
+    });
+
+    ipcMain.handle(IpcChannel.GetChangelog, async (): Promise<PendingChangelog | null> => {
+        const cached = readChangelogFile(cachedChangelogFile);
+        if (cached) return cached;
+
+        const latestSha = await fetchLatestMainSha();
+        const commits = await fetchAllCommitsUpTo(latestSha);
+        if (commits.length === 0) return null;
+
+        mkdirSync(paths.data, { recursive: true });
+        const payload: PendingChangelog = { commits };
+        writeFileSync(cachedChangelogFile, JSON.stringify(payload), "utf8");
+        return payload;
     });
 
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));
@@ -342,8 +359,9 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
         const commits = await fetchAllCommitsUpTo(latestSha);
         if (commits.length > 0) {
             mkdirSync(paths.data, { recursive: true });
-            const payload: PendingChangelog = { commits };
-            writeFileSync(pendingChangelogFile, JSON.stringify(payload), "utf8");
+            const serialized = JSON.stringify({ commits } satisfies PendingChangelog);
+            writeFileSync(pendingChangelogFile, serialized, "utf8");
+            writeFileSync(cachedChangelogFile, serialized, "utf8");
         }
 
         const medalExe = process.execPath;

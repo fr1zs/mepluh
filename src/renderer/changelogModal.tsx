@@ -45,7 +45,7 @@ const renderPastEntry = (commit: ChangelogCommit): string => {
     `;
 };
 
-const mountChangelogDialog = (changelog: PendingChangelog): void => {
+const mountChangelogDialog = (changelog: PendingChangelog, clearPendingOnClose: boolean): void => {
     if (document.getElementById(MODAL_ID)) return;
     const latest = changelog.commits[0];
     if (!latest) return;
@@ -97,7 +97,9 @@ const mountChangelogDialog = (changelog: PendingChangelog): void => {
     const close = (): void => {
         window.removeEventListener("keydown", onKeyDown, true);
         overlay.remove();
-        void MepluhNative.dismissPendingChangelog();
+        if (clearPendingOnClose) {
+            void MepluhNative.dismissPendingChangelog();
+        }
     };
 
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -142,10 +144,17 @@ const waitForMedalUiReady = (): Promise<void> =>
         }, 8000);
     });
 
+export const showChangelogModal = async (): Promise<boolean> => {
+    const changelog = await MepluhNative.getChangelog();
+    if (!changelog || changelog.commits.length === 0) return false;
+    mountChangelogDialog(changelog, false);
+    return true;
+};
+
 export const checkAndShowPendingChangelog = async (): Promise<void> => {
     const changelog = await MepluhNative.getPendingChangelog();
     if (!changelog || changelog.commits.length === 0) return;
     await whenDomReady();
     await waitForMedalUiReady();
-    window.setTimeout(() => mountChangelogDialog(changelog), 600);
+    window.setTimeout(() => mountChangelogDialog(changelog, true), 600);
 };

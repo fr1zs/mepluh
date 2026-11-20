@@ -1,6 +1,7 @@
 import { MOD_NAME } from "@shared/constants";
 import type { PluginDefinition } from "@shared/plugin";
 import { settingsPath } from "@shared/settingsTabs";
+import { showChangelogModal } from "../../changelogModal";
 import { medalUi } from "../../medal/components";
 import type { RendererPluginManager } from "../../pluginManager";
 import type { SettingsContext } from "../context";
@@ -89,6 +90,12 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
         if (updateStatus === "checking" || updateStatus === "updating") return;
         if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
 
+        if (updateStatus === "latest") {
+            setUpdateStatus("idle");
+            await showChangelogModal();
+            return;
+        }
+
         if (updateStatus === "available") {
             setUpdateStatus("updating");
             try {
@@ -105,7 +112,7 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
             const result = await MepluhNative.updateMepluh(false);
             if (result === "up-to-date") {
                 setUpdateStatus("latest");
-                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 4000);
+                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 6000);
             } else if (result === "available") {
                 setUpdateStatus("available");
             } else {
@@ -121,7 +128,7 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
         updateStatus === "checking"
             ? "Checking for updates..."
             : updateStatus === "latest"
-              ? "The latest version of Mepluh is installed."
+              ? "The latest version of Mepluh is installed. Click again to show patch notes."
               : updateStatus === "available"
                 ? "Update available — Click again to install & restart Medal"
                 : updateStatus === "updating"
