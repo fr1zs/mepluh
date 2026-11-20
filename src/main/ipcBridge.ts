@@ -1,4 +1,4 @@
-import { app, ipcMain, net, shell } from "electron";
+import { app, BrowserWindow, ipcMain, net, shell } from "electron";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -15,6 +15,7 @@ import type { ThemeService } from "./themes/themeService";
 
 const GITHUB_COMMIT_API = "https://api.github.com/repos/fr1zs/mepluh/commits/main";
 const REPO_ZIP_URL = "https://github.com/fr1zs/mepluh/archive/refs/heads/main.zip";
+const UPDATE_CHECK_INTERVAL_MS = 12 * 60 * 60 * 1000;
 
 export interface PatchReportSource {
     readonly report: PatchReport;
@@ -33,6 +34,79 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     const rendererSource = readFileSync(paths.renderer, "utf8");
     const versionFile = join(paths.data, ".installed-commit");
     const availableFile = join(paths.data, ".available-commit");
+    const lastCheckFile = join(paths.data, ".last-update-check");
+
+    const broadcastUpdateAvailable = (available: boolean): void => {
+        for (const win of BrowserWindow.getAllWindows()) {
+            if (!win.isDestroyed()) {
+                win.webContents.send(IpcChannel.UpdateAvailableChanged, available);
+            }
+        }
+    };
+
+    const readUpdateAvailable = (): boolean => {
+        if (!existsSync(availableFile)) return false;
+        const availableSha = readFileSync(availableFile, "utf8").trim();
+        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
+        if (availableSha && availableSha !== installedSha) return true;
+        try {
+            unlinkSync(availableFile);
+        } catch {}
+        return false;
+    };
+
+    const checkForUpdates = async (): Promise<{ status: "up-to-date" | "available"; latestSha: string }> => {
+        const res = await net.fetch(GITHUB_COMMIT_API, {
+            headers: { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" }
+        });
+        if (!res.ok) throw new Error(`GitHub check failed (${res.status})`);
+
+        const data = (await res.json()) as { sha?: string };
+        const latestSha = data.sha?.trim();
+        if (!latestSha) throw new Error("Unable to read latest version from GitHub");
+
+        mkdirSync(paths.data, { recursive: true });
+        writeFileSync(lastCheckFile, String(Date.now()), "utf8");
+
+        const wasAvailable = readUpdateAvailable();
+        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
+
+        if (installedSha && installedSha === latestSha) {
+            if (existsSync(availableFile)) {
+                try {
+                    unlinkSync(availableFile);
+                } catch {}
+            }
+            if (wasAvailable) broadcastUpdateAvailable(false);
+            return { status: "up-to-date", latestSha };
+        }
+
+        writeFileSync(availableFile, latestSha, "utf8");
+        if (!wasAvailable) broadcastUpdateAvailable(true);
+        return { status: "available", latestSha };
+    };
+
+    const runScheduledUpdateCheck = async (): Promise<void> => {
+        try {
+            if (existsSync(lastCheckFile)) {
+                const lastCheck = Number(readFileSync(lastCheckFile, "utf8").trim());
+                if (Number.isFinite(lastCheck) && Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS) {
+                    return;
+                }
+            }
+            await checkForUpdates();
+        } catch {}
+    };
+
+    const startupCheckTimer = setTimeout(() => {
+        void runScheduledUpdateCheck();
+    }, 10_000);
+    startupCheckTimer.unref?.();
+
+    const periodicCheckTimer = setInterval(() => {
+        void checkForUpdates().catch(() => {});
+    }, UPDATE_CHECK_INTERVAL_MS);
+    periodicCheckTimer.unref?.();
 
     ipcMain.on(IpcChannel.RendererSource, event => {
         event.returnValue = rendererSource;
@@ -47,20 +121,7 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     });
 
     ipcMain.on(IpcChannel.UpdateAvailableGet, event => {
-        if (!existsSync(availableFile)) {
-            event.returnValue = false;
-            return;
-        }
-        const availableSha = readFileSync(availableFile, "utf8").trim();
-        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
-        if (availableSha && availableSha !== installedSha) {
-            event.returnValue = true;
-            return;
-        }
-        try {
-            unlinkSync(availableFile);
-        } catch {}
-        event.returnValue = false;
+        event.returnValue = readUpdateAvailable();
     });
 
     ipcMain.handle(IpcChannel.SettingsSet, (_event, plugin: string, settings: PluginSettings) => store.update(plugin, settings));
@@ -71,30 +132,9 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
     });
 
     ipcMain.handle(IpcChannel.UpdateMepluh, async (_event, install = false): Promise<UpdateResult> => {
-        const res = await net.fetch(GITHUB_COMMIT_API, {
-            headers: { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" }
-        });
-        if (!res.ok) throw new Error(`GitHub check failed (${res.status})`);
-
-        const data = (await res.json()) as { sha?: string };
-        const latestSha = data.sha?.trim();
-        if (!latestSha) throw new Error("Unable to read latest version from GitHub");
-
-        const installedSha = existsSync(versionFile) ? readFileSync(versionFile, "utf8").trim() : "";
-        if (installedSha && installedSha === latestSha) {
-            if (existsSync(availableFile)) {
-                try {
-                    unlinkSync(availableFile);
-                } catch {}
-            }
-            return "up-to-date";
-        }
-
-        if (!install) {
-            mkdirSync(paths.data, { recursive: true });
-            writeFileSync(availableFile, latestSha, "utf8");
-            return "available";
-        }
+        const { status, latestSha } = await checkForUpdates();
+        if (status === "up-to-date") return "up-to-date";
+        if (!install) return "available";
 
         const medalExe = process.execPath;
         const squirrelUpdater = join(medalExe, "..", "..", "Update.exe");

@@ -30,6 +30,11 @@ const native: MepluhNative = {
     relaunch: () => ipcRenderer.invoke(IpcChannel.Relaunch) as Promise<void>,
     updateMepluh: (install = false) => ipcRenderer.invoke(IpcChannel.UpdateMepluh, install) as Promise<UpdateResult>,
     isUpdateAvailable: () => Boolean(ipcRenderer.sendSync(IpcChannel.UpdateAvailableGet)),
+    onUpdateAvailableChanged: listener => {
+        const forward = (_event: IpcRendererEvent, available: unknown): void => listener(Boolean(available));
+        ipcRenderer.on(IpcChannel.UpdateAvailableChanged, forward);
+        return () => ipcRenderer.off(IpcChannel.UpdateAvailableChanged, forward);
+    },
     openPath: location => ipcRenderer.invoke(IpcChannel.OpenPath, location) as Promise<void>,
     patchReport: () => ipcRenderer.invoke(IpcChannel.PatchReport) as Promise<PatchReport>,
     loadMonaco,

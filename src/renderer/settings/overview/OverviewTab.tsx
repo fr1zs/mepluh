@@ -73,7 +73,14 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
     const resetTimerRef = React.useRef<number | undefined>(undefined);
 
     React.useEffect(() => {
+        const unsubscribe = MepluhNative.onUpdateAvailableChanged(available => {
+            setUpdateStatus(prev => {
+                if (prev === "checking" || prev === "updating") return prev;
+                return available ? "available" : prev === "available" ? "idle" : prev;
+            });
+        });
         return () => {
+            unsubscribe();
             if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
         };
     }, []);
