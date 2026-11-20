@@ -45,8 +45,7 @@ Open Medal's settings and look for the **Mepluh** section.
 
 **When Medal updates, Mepluh gets uninjected. So when it does, open Powershell and run:**
 ```sh
-cd mepluh
-bun run inject
+cd ~\mepluh; bun run inject
 ```
 
 Mepluh has a built in updater, so when it updates it all you have to to is press a button and it should be good to go!
