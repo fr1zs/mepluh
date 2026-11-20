@@ -118,9 +118,34 @@ const mountChangelogDialog = (changelog: PendingChangelog): void => {
     (document.body ?? document.documentElement).appendChild(overlay);
 };
 
+const waitForMedalUiReady = (): Promise<void> =>
+    new Promise(resolve => {
+        const isReady = (): boolean =>
+            Boolean(document.querySelector('[data-slot="standard-icon"], nav, main'));
+
+        if (isReady()) {
+            resolve();
+            return;
+        }
+
+        const observer = new MutationObserver(() => {
+            if (isReady()) {
+                observer.disconnect();
+                resolve();
+            }
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+
+        window.setTimeout(() => {
+            observer.disconnect();
+            resolve();
+        }, 8000);
+    });
+
 export const checkAndShowPendingChangelog = async (): Promise<void> => {
     const changelog = await MepluhNative.getPendingChangelog();
     if (!changelog || changelog.commits.length === 0) return;
     await whenDomReady();
-    window.setTimeout(() => mountChangelogDialog(changelog), 1000);
+    await waitForMedalUiReady();
+    window.setTimeout(() => mountChangelogDialog(changelog), 600);
 };
