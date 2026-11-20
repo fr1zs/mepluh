@@ -46,6 +46,24 @@ export interface IpcServices {
     readonly themes: ThemeService;
 }
 
+const isIgnoredDocsFile = (filename: string): boolean => {
+    const normalized = filename.trim().toLowerCase();
+    return normalized === "readme.md" || normalized.endsWith("/readme.md");
+};
+
+const hasCodeChangesBetween = async (fromSha: string, toSha: string): Promise<boolean> => {
+    const headers = { "User-Agent": "Mepluh-Updater", Accept: "application/vnd.github+json" };
+    try {
+        const res = await net.fetch(`${GITHUB_REPO_API}/compare/${fromSha}...${toSha}`, { headers });
+        if (!res.ok) return true;
+        const data = (await res.json()) as { files?: ReadonlyArray<{ readonly filename?: string }> };
+        if (!Array.isArray(data.files) || data.files.length === 0) return false;
+        return data.files.some(file => typeof file.filename === "string" && !isIgnoredDocsFile(file.filename));
+    } catch {
+        return true;
+    }
+};
+
 const parseGitHubCommit = (item: GitHubCommitItem): ChangelogCommit | null => {
     const rawMessage = item.commit?.message?.trim() ?? "";
     if (!rawMessage) return null;
@@ -134,6 +152,20 @@ export const registerIpcBridge = ({ paths, store, runtime, patches, themes }: Ip
             }
             if (wasAvailable) broadcastUpdateAvailable(false);
             return { status: "up-to-date", latestSha };
+        }
+
+        if (installedSha) {
+            const hasCodeChanges = await hasCodeChangesBetween(installedSha, latestSha);
+            if (!hasCodeChanges) {
+                writeFileSync(versionFile, latestSha, "utf8");
+                if (existsSync(availableFile)) {
+                    try {
+                        unlinkSync(availableFile);
+                    } catch {}
+                }
+                if (wasAvailable) broadcastUpdateAvailable(false);
+                return { status: "up-to-date", latestSha };
+            }
         }
 
         writeFileSync(availableFile, latestSha, "utf8");
