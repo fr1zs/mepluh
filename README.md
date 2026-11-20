@@ -20,7 +20,7 @@
 - 🫧 **Liquid Glass.** Refractive, light-reactive glass with Windows 11 Acrylic and Mica backdrops.
 - ✏️ **Custom CSS.** A built-in Monaco editor with autocomplete and live preview.
 - ⏩ **Arrow seeking.** Scrub through clips using the keyboard arrow keys.
-- ↕️ **Media navigation.** Switch between clips and screenshots using the up and down arrow keys.
+- 🔼 **Media navigation.** Switch between clips and screenshots using the up and down arrow keys.
 - 🔍 **Screenshot zoom.** Zoom and pan into screenshots instead of copying on click.
 - 🎬 **Start on clips.** Launch straight into your clips library on startup instead of the home feed.
 - 🖥️ **Desktop game detection.** Categorizes Screen Recording clips under the running game, if any.
