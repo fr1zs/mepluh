@@ -73,6 +73,13 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
     );
     const resetTimerRef = React.useRef<number | undefined>(undefined);
 
+    const clearResetTimer = () => {
+        if (resetTimerRef.current !== undefined) {
+            window.clearTimeout(resetTimerRef.current);
+            resetTimerRef.current = undefined;
+        }
+    };
+
     React.useEffect(() => {
         const unsubscribe = MepluhNative.onUpdateAvailableChanged(available => {
             setUpdateStatus(prev => {
@@ -82,17 +89,17 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
         });
         return () => {
             unsubscribe();
-            if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
+            clearResetTimer();
         };
     }, []);
 
     const handleUpdateClick = async () => {
         if (updateStatus === "checking" || updateStatus === "updating") return;
-        if (resetTimerRef.current !== undefined) window.clearTimeout(resetTimerRef.current);
+        clearResetTimer();
 
         if (updateStatus === "latest") {
             setUpdateStatus("idle");
-            await showChangelogModal();
+            void showChangelogModal();
             return;
         }
 
@@ -112,7 +119,7 @@ export const createOverviewTab = ({ plugins: manager }: SettingsContext) => () =
             const result = await MepluhNative.updateMepluh(false);
             if (result === "up-to-date") {
                 setUpdateStatus("latest");
-                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 6000);
+                resetTimerRef.current = window.setTimeout(() => setUpdateStatus("idle"), 10000);
             } else if (result === "available") {
                 setUpdateStatus("available");
             } else {

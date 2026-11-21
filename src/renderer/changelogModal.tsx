@@ -147,6 +147,7 @@ const waitForMedalUiReady = (): Promise<void> =>
 export const showChangelogModal = async (): Promise<boolean> => {
     const changelog = await MepluhNative.getChangelog();
     if (!changelog || changelog.commits.length === 0) return false;
+    await whenDomReady();
     mountChangelogDialog(changelog, false);
     return true;
 };
@@ -156,5 +157,5 @@ export const checkAndShowPendingChangelog = async (): Promise<void> => {
     if (!changelog || changelog.commits.length === 0) return;
     await whenDomReady();
     await waitForMedalUiReady();
-    window.setTimeout(() => mountChangelogDialog(changelog, true), 600);
+    window.setTimeout(() => mountChangelogDialog(changelog, true), 300);
 };
